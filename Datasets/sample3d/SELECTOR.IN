@@ -1,0 +1,34 @@
+Pcp_File_Version=4
+*** BLOCK A: BASIC INFORMATION *****************************************
+Heading
+Welcome to HYDRUS
+LUnit  TUnit  MUnit  (indicated units are obligatory for all input data)
+cm
+min
+mmol
+MaxIt   TolTh   TolH InitH/W  (max. number of iterations and tolerances)
+  10    0.001      1     t
+lWat lChem lSink Short Inter lScrn AtmIn lTemp lWTDep lEquil lExtGen lInv
+ t     f     f     f     f    t     t     f     f      t      t      f
+lUnsatCh lCFSTr   lHP2   m_lActRSU lDummy  lDummy  lDummy
+ f       f       f       f       f       f       f
+ PrintStep  PrintInterval lEnter
+         1              0       t
+*** BLOCK B: MATERIAL INFORMATION **************************************
+NMat    NLay    hTab1   hTabN     NAniz
+  1       1    0.0001   10000       1
+    Model   Hysteresis
+      0          0
+  thr    ths   Alfa     n         Ks      l
+ 0.045   0.43  0.145   2.68      0.495    0.5 
+  ConAX   ConAY   ConAZ Cos(Xx) Cos(Yy) Cos(Zz) Cos(Xy) Cos(Xz) Cos(Yz)
+      1       1       1       1       1       1       0       0       0 
+*** BLOCK C: TIME INFORMATION ******************************************
+        dt       dtMin       dtMax     DMul    DMul2  ItMin ItMax  MPL
+      0.001      1e-008        7200     1.3     0.7     3     7     7
+      tInit        tMax
+          0        1440
+TPrint(1),TPrint(2),...,TPrint(MPL)
+         15          60         120         180         360         720 
+       1440 
+*** END OF INPUT FILE 'SELECTOR.IN' ************************************

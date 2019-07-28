@@ -411,30 +411,51 @@ def retrieve_all_csv_files(source_folder, get='all', retrieve_folders_only=False
         names, and it will NOT convert any HYDRUS file to CSV.
     If get_only_new=True, the function will look for the files in the output_folder
         if not None, then it will calculate only the files that do not exist.
+    get can be a list, if so.. all string elements of the list should be in the folder name.
     '''
     subfolders ={}
     # print('===============Creating Folders list ===============')
     for subdir, dirs, files in os.walk(source_folder):
         for i in dirs:
             if 'Genex' not in dirs:
-                if get =='all':
-                    subfolders[i]=i[5:]
-                elif get.lower() in i[5:].lower():
-                    subfolders[i]=i[5:]
-                else:
-                    continue
+                if isinstance(get, list):
+                    add_folder = True
+                    # all text members in get should exist in the filename
+                    for g in get:
+                        if not(g.lower() in i[5:].lower()):
+                            add_folder = False
+                    if add_folder:
+                        subfolders[i]=i[5:]
+                    pass
+                else:  #get is string
+                    if get =='all':
+                        subfolders[i]=i[5:]
+                    elif get.lower() in i[5:].lower():
+                        subfolders[i]=i[5:]
+                    else:
+                        continue
     # Creating exceptions list
     
     if get_only_new & (output_folder is not None):
         exceptions = []
         for subdir, dirs, files in os.walk(output_folder):
             for i in files:
-                if get =='all':
-                    exceptions.append(i[:-4])
-                elif get.lower() in i[:-4].lower():
-                    exceptions.append(i[:-4])
-                else:
-                    continue
+                if isinstance(get, list):
+                    add_folder = True
+                    # all text members in get should exist in the filename
+                    for g in get:
+                        if not(g.lower() in i[:-4].lower()):
+                            add_folder = False
+                    if add_folder:
+                        exceptions.append(i[:-4])
+                    pass
+                else:  #get is string
+                    if get =='all':
+                        exceptions.append(i[:-4])
+                    elif get.lower() in i[:-4].lower():
+                        exceptions.append(i[:-4])
+                    else:
+                        continue
         
         temp_subfolders={}
         if len(exceptions)>0:
@@ -461,8 +482,8 @@ def retrieve_all_csv_files(source_folder, get='all', retrieve_folders_only=False
     print('====================================================')
 
 # test
-#@# retrieve_all_csv_files(source, get='all', retrieve_folders_only=True,
-                          # get_only_new=True, output_folder=output)
+# retrieve_all_csv_files(source, get='all', retrieve_folders_only=True,
+#                           get_only_new=True, output_folder=output)
 
 
 # # Reading individual files
@@ -775,17 +796,18 @@ def get_section_grid(source_df_1, axis_of_section='y', grid_value=1.,
             selected
     
     '''
-    if is_axisymmetric:
-        # if the simulation is Axisymmetric 3D, then take only the
-        # positive quater to compare with the 2D sections
-        source_df=source_df_1[(source_df_1.x>=0)&(source_df_1.y>=0)]
-    else:
-        source_df=source_df_1
+    source_df = source_df_1
+#     if is_axisymmetric:
+#         # if the simulation is Axisymmetric 3D, then take only the
+#         # positive quater to compare with the 2D sections
+#         source_df=source_df_1[(source_df_1.x>=0)&(source_df_1.y>=0)]
+#     else:
+#         source_df=source_df_1
 
     # find boundaries of x, y, and z (min then max)
     src_axis = [axs for axs in ['x', 'y','z'] if axs in source_df.columns]
     n_axis = len(src_axis)
-    inf = source_df.describe()[src_axis].iloc[[3,7]]
+    inf = source_df[src_axis].describe().iloc[[3,7]]
     inf2 = list(inf.values.T)
     mn, mx, iv, lv=[0]*n_axis,[0]*n_axis,[0]*n_axis,[0]*n_axis
     grid = grid_value  # cm
@@ -891,53 +913,162 @@ def get_section_dataframes(source_df, axis_of_section='y', cross_at=20.,
 
 def get_grid_values(data_frame, variable=0, time_step = 180, grid = 0.5, 
                     crosses = 35., tol = 10., section ='x', 
-                    testing=False, is2d=False, is_axisymmetric=False):
+                    testing=False, is2d=False, is_axisymmetric=False,
+                    get_two_arrays=False):
     '''
     
     '''
     
     #Find the variable mask
     v_mask = {0:'Th', 1:'H'}[variable] # , 2:'V'
-    if testing: print(v_mask)
-        
-    # first get the dataframe of the neighbors of the required cross-section
-    # (source_df, axis_of_section='y', cross_at=20., tolerance=15., 
-    #   output='before & after')
-#     print('is2d from get_grid_values: ', is2d)
-    if is2d:
-        src = data_frame
-        scr_cols=[axs for axs in ['x', 'y','z'] if axs in data_frame.columns]     
-        points = np.array(src[scr_cols])
-    else:
-        src= get_section_dataframes(data_frame, axis_of_section=section, 
-                                    cross_at=crosses, tolerance=tol, output='full')
-        points = np.array(src[['x', 'y','z']])
-    z_values = np.array(src[['{}_T={}'.format(v_mask, time_step)]])
-    if testing: print ('src shape:{}, points shape:{}, z_values shape::'.
-                       format (src.shape, points.shape, z_values.shape))
-    if testing: print(src[['{}_T={}'.format(v_mask, time_step)]].head())
-    # get the grid info
-    # (source_df, axis_of_section='y', grid_value=1., default_value=20., output_method='3D')
-    if is2d:
-        cs = get_section_grid(data_frame, 
-                              axis_of_section='y', grid_value=grid, 
-                              default_value=0., output_method='2D')
-    else:
-        cs = get_section_grid(data_frame, axis_of_section=section, 
-                              grid_value=grid, default_value=crosses, 
-                              output_method='3D',
-                              is_axisymmetric=is_axisymmetric)
-    
-    requests = np.array(cs[0])
-    # x_vals, z_vals are the two used axes, regardless they are XY, XZ, or YZ
-    x_vals, z_vals = cs[1][0], cs[1][1]
-    if testing: print ('requests shape:{}, x_vals shape:{}, z_vals shape:{}'.
-                       format (requests.shape, x_vals.shape, z_vals.shape))
-    
-    X, Z = np.meshgrid(x_vals, z_vals)
-#     M = griddata(points, z_values, requests).reshape((X.shape[1], X.shape[0])).T
-    if testing: print ('points shape:{}, z_values shape:{}, requests shape:{}'.
-                       format (points.shape, z_values.shape, requests.shape))
+
+
+    def get_z_frame_outputs(src1, v_mask1, time_step1, cs1, points1):
+        z_values = np.array(src1[['{}_T={}'.format(v_mask1, time_step1)]])
+        requests = np.array(cs1[0])
+        # x_vals, z_vals are the two used axes, regardless they are XY, XZ, or YZ
+        x_vals, z_vals = cs1[1][0], cs1[1][1]
+        X, Z = np.meshgrid(x_vals, z_vals)
+        print(z_values.shape, requests.shape, points1.shape)
+        M = griddata(points1, z_values, requests).reshape((X.shape[1], X.shape[0])).T
+        returns = X, Z, M, x_vals, z_vals
+        if len (returns)<5:
+            print (zip(['src1', 'v_mask1', 'time_step1', 'cs1', 'points1'],
+                       [src1, v_mask1, time_step1, cs1, points1]))
+        return returns
+
+    if not get_two_arrays:  # This is the normal case to get only one array
+        if is2d:
+            source_df = data_frame
+            src = data_frame
+            scr_cols=[axs for axs in ['x', 'y','z'] if axs in data_frame.columns]
+            points = np.array(src[scr_cols])
+            cs = get_section_grid(source_df,
+                                  axis_of_section='y', grid_value=grid,
+                                  default_value=0., output_method='2D')
+            return get_z_frame_outputs(source_df, v_mask, time_step, cs, points)
+        else: # 3D
+            src= get_section_dataframes(data_frame, axis_of_section=section,
+                                        cross_at=crosses, tolerance=tol, output='full')
+            display(src.describe())
+            points = np.array(src[['x', 'y','z']])
+            display(points.shape)
+
+            if is_axisymmetric:
+                # if the simulation is Axisymmetric 3D, then take only the
+                # positive quater to compare with the 2D sections
+                source_df=data_frame[(data_frame.x>=0)&(data_frame.y>=0)]
+            else: # pXZ
+                source_df=data_frame
+                pass
+
+            display(source_df.describe())
+
+            cs = get_section_grid(data_frame, axis_of_section=section,
+                                  grid_value=grid, default_value=crosses,
+                                  output_method='3D',
+                                  is_axisymmetric=is_axisymmetric)
+
+            display(cs)
+
+            returns = get_z_frame_outputs(source_df, v_mask, time_step, cs, points)
+            return returns
+
+    else:  # get_two_arrays==True
+        if is2d:
+            if is_axisymmetric:
+                print('2d_axi')
+                source_df=data_frame
+                scr_cols=[axs for axs in ['x', 'y','z'] if axs in source_df.columns]
+                points = np.array(source_df[scr_cols])
+                cs = get_section_grid(source_df,
+                                  axis_of_section='y', grid_value=grid,
+                                  default_value=0., output_method='2D')
+
+                return get_z_frame_outputs(source_df, v_mask, time_step, cs, points)
+            else: # pXZ
+                # two dataframes
+                print('2d_pXZ')
+                source_full =data_frame
+                # get the middle point of the X coordinate to slice the df to half.
+                cord_inf = df[['x','z']].describe().iloc[[3,7]].values.T
+                x_avg = (cord_inf[0][1]-cord_inf[0][0])/2.
+                source_half =data_frame.copy()
+                source_half['x']=source_half['x']-x_avg
+                source_half = source_half[source_half.x >= 0]
+                scr_cols=[axs for axs in ['x', 'y','z'] if axs in source_df.columns]
+                points_f = np.array(source_full[scr_cols])
+                points_h = np.array(source_half[scr_cols])
+                cs_f = get_section_grid(source_full,
+                                  axis_of_section='y', grid_value=grid,
+                                  default_value=0., output_method='2D')
+                cs_h = get_section_grid(source_half,
+                                  axis_of_section='y', grid_value=grid,
+                                  default_value=0., output_method='2D')
+                return (get_z_frame_outputs(source_full, v_mask, time_step, cs_f, points_f),
+                       get_z_frame_outputs(source_half, v_mask, time_step, cs_h, points_h))
+        else: # 3D
+            if is_axisymmetric:
+                print('3d_axi')
+                # if the simulation is Axisymmetric 3D, then take only the
+                # positive quater to compare with the 2D sections
+                source_df=data_frame[(data_frame.x>=0)&(data_frame.y>=0)]
+                src= get_section_dataframes(source_df, axis_of_section=section,
+                                        cross_at=crosses, tolerance=tol, output='full')
+                points = np.array(src[['x', 'y','z']])
+                cs = get_section_grid(source_df, axis_of_section=section,
+                                      grid_value=grid, default_value=crosses,
+                                      output_method='3D',
+                                      is_axisymmetric=is_axisymmetric)
+#                 cs = get_section_grid(src, axis_of_section=section,
+#                                       grid_value=grid, default_value=crosses,
+#                                       output_method='3D',
+#                                       is_axisymmetric=is_axisymmetric)
+                returns = get_z_frame_outputs(source_df, v_mask, time_step, cs, points)
+#                 returns = get_z_frame_outputs(src, v_mask, time_step, cs, points)
+                return returns
+            else: # pXZ
+                # two dataframes
+                print('3d_pXZ')
+                source_full =data_frame
+                # get the middle point of the X coordinate to slice the df to half.
+                cord_inf = source_full[['x','z']].describe().iloc[[3,7]].values.T
+                x_avg = (cord_inf[0][1]-cord_inf[0][0])/2.
+                source_half = data_frame.copy()
+                source_half['x'] = source_half['x'] - x_avg
+                source_half = source_half [source_half.x >= 0]
+                scr_cols = ['x', 'y','z']  # they are 3D
+                src_f = get_section_dataframes(source_full, axis_of_section=section,
+                                        cross_at=crosses, tolerance=tol, output='full')
+                src_h = get_section_dataframes(source_half, axis_of_section=section,
+                                        cross_at=crosses, tolerance=tol, output='full')
+                points_f = np.array(src_f[scr_cols])
+                points_h = np.array(src_h[scr_cols])
+                cs_f = get_section_grid(source_full,
+                                  axis_of_section=section,
+                                  grid_value=grid, default_value=crosses,
+                                  output_method='3D',
+                                  is_axisymmetric=is_axisymmetric)
+                cs_h = get_section_grid(source_half,
+                                  axis_of_section=section,
+                                  grid_value=grid, default_value=crosses,
+                                  output_method='3D',
+                                  is_axisymmetric=is_axisymmetric)
+#                 cs_f = get_section_grid(src_f,
+#                                   axis_of_section=section,
+#                                   grid_value=grid, default_value=crosses,
+#                                   output_method='3D',
+#                                   is_axisymmetric=is_axisymmetric)
+#                 cs_h = get_section_grid(src_h,
+#                                   axis_of_section=section,
+#                                   grid_value=grid, default_value=crosses,
+#                                   output_method='3D',
+#                                   is_axisymmetric=is_axisymmetric)
+
+                return (get_z_frame_outputs(source_full, v_mask, time_step, cs_f, points_f),
+                       get_z_frame_outputs(source_half, v_mask, time_step, cs_h, points_h))
+#                 return (get_z_frame_outputs(src_f, v_mask, time_step, cs_f, points_f),
+#                        get_z_frame_outputs(src_h, v_mask, time_step, cs_h, points_h))
 
     M = griddata(points, z_values, requests).reshape((X.shape[1], X.shape[0])).T
 
@@ -1048,12 +1179,11 @@ def get_legend_range(mn, mx):
 def draw_contour(X, Z, M, levels=None, 
                  plot_title="ElNesr cross sectional contour map",
                 x_step=10., z_step=25., mirror_x=False, mirror_z=False,
-                return_figure_object=False):
+                return_figure_object=False, fig_size=(18, 7)):
     '''
     
     '''
-#     print('mir_X draw_contour: ', mirror_x)
-    fig = plt.figure(num=None, figsize=(18, 7), dpi=80, facecolor='w', edgecolor='k');
+    fig = plt.figure(num=None, figsize=fig_size, dpi=80, facecolor='w', edgecolor='k');
     origin = 'lower'
     
     if levels is None:
@@ -1187,7 +1317,7 @@ def draw_full_contour(data_frame,variable=0, time_step=180, grid= 0.5,
                       return_arrays=True, x_step=None, z_step=None,
                       mirror_x=False, mirror_z=False, is2d=False, 
                       output_the_contour=True, is_axisymmetric=False,
-                      return_figure_object=False):
+                      return_figure_object=False, fig_size=(18, 7)):
     
     '''
     Either (1) set the return_arrays to True and use on right 
@@ -1201,12 +1331,212 @@ def draw_full_contour(data_frame,variable=0, time_step=180, grid= 0.5,
     (2)
        draw_full_contour(data_frame,variable, time_step, grid, crosses, 
                            tol, section, return_arrays=False)    
+
     '''
 #     print('is2d=', is2d)
-    X, Z, M, x_vals, z_vals = get_grid_values(data_frame, variable, 
-                                              time_step, grid, crosses, 
-                                              tol, section, is2d=is2d,
-                                             is_axisymmetric=is_axisymmetric)
+    X, Z, M, x_vals, z_vals = get_grid_values(data_frame,
+                             variable,
+                             time_step, grid, crosses,
+                             tol, section, is2d=is2d,
+                             is_axisymmetric=is_axisymmetric,
+                             get_two_arrays=get_two_arrays)
+    # print(x_vals.shape, z_vals.shape, X.shape, Z.shape, M.shape)
+    if levels is None:
+        levels = get_legend_range(np.nanmin(M),np.nanmax(M))#np.arange(0.15, 0.42, 0.03)
+
+    mn, mx = np.nanmin(M),np.nanmax(M)
+    # print (mx,mn, mx-mn)
+    if mx - mn < 0.000000001:
+        print('For the requested contour map of {}'.format(plot_title), end='. ')
+        print ("The map has one value only ({}), no contour map will be drawn.".
+               format(mn))
+        can_draw_figure=False
+    else:
+        can_draw_figure=True
+
+    if not output_the_contour and not return_figure_object:
+        fig = None
+    else:
+        if can_draw_figure:
+            fig = draw_contour(X, Z, M, levels, plot_title, x_step, z_step,
+                             mirror_x, mirror_z, return_figure_object, fig_size=fig_size);
+        else:
+            fig = None
+
+#     exit()
+    if return_arrays:
+        if output_the_contour:
+            if return_figure_object:
+                return X, Z, M, levels, fig
+            else: # return_figure_object=False
+                display(fig)
+                return X, Z, M, levels
+        else:  #output_the_contour=False
+            if return_figure_object:
+                return X, Z, M, levels, fig
+            else: # return_figure_object=False
+                return X, Z, M, levels
+    else:  #return_arrays=False
+        if output_the_contour:
+            if return_figure_object:
+                return fig
+            else: # return_figure_object=False
+                display(fig)
+        else:  #output_the_contour=False
+            if return_figure_object:
+                return fig
+
+
+# In[194]:
+
+
+def get_packed_arrays(data_frame,variable=0, time_step=180, grid= 0.5,
+                      crosses=35., tol=10., section= 'x', is2d=False,
+                      is_axisymmetric=False, levels=None,
+                      get_two_arrays=False):  #, proceed_with_array_number=0):
+    """
+    draw_full_contour2_1
+    part one of the modified draw_full_contour function
+    for the axi-pXZ relationships
+    """
+    packed_grid_values = get_grid_values(data_frame,
+                                 variable,
+                                 time_step, grid, crosses,
+                                 tol, section, is2d=is2d,
+                                 is_axisymmetric=is_axisymmetric,
+                                 get_two_arrays=get_two_arrays)
+    X, Z, M, _, __ = packed_grid_values
+    if levels is None:
+        levels = get_legend_range(np.nanmin(M),np.nanmax(M))#np.arange(0.15, 0.42, 0.03)
+    return X, Z, M, levels
+# if not get_two_arrays:
+#     X, Z, M, x_vals, z_vals = get_packed_arrays(...)
+# else
+#     X, Z, M, x_vals, z_vals = get_packed_arrays(...)[proceed_with_array_number 0 or 1]
+
+
+# In[195]:
+
+
+def draw_full_contour_v2(X, Z, M, x_vals, z_vals, levels=None,
+                      plot_title="ElNesr cross sectional contour map",
+                      return_arrays=True, x_step=None, z_step=None,
+                      mirror_x=False, mirror_z=False, is2d=False,
+                      output_the_contour=True, is_axisymmetric=False,
+                      return_figure_object=False, fig_size=(18, 7),
+                      get_two_arrays=False, proceed_with_array_number=0):
+
+
+    '''
+    Either (1) set the return_arrays to True and use on right
+                hand side of equal sign,
+    OR     (2) set the return_arrays to False and use the function as is.
+    Examples:
+    (1)
+       arrays = draw_full_contour(data_frame,variable, time_step, grid,
+                                   crosses, tol, section)
+       It will draws the chart AND sets arrays=X, Z, M, levels
+    (2)
+       draw_full_contour(data_frame,variable, time_step, grid, crosses,
+                           tol, section, return_arrays=False)
+    if get_two_arrays ==True, then it will return two datasets:
+            one as the normal dataframe,
+            and one as half the dataframe(for axi compare).
+            (This happens only of the df is pXZ)
+            for now, the figures will be drawn using the normal (first) array only.
+            We may change this in the future.
+    '''
+#     print('is2d=', is2d)
+
+    # print(x_vals.shape, z_vals.shape, X.shape, Z.shape, M.shape)
+    if levels is None:
+        levels = get_legend_range(np.nanmin(M),np.nanmax(M))#np.arange(0.15, 0.42, 0.03)
+
+    mn, mx = np.nanmin(M),np.nanmax(M)
+    # print (mx,mn, mx-mn)
+    if mx - mn < 0.000000001:
+        print('For the requested contour map of {}'.format(plot_title), end='. ')
+        print ("The map has one value only ({}), no contour map will be drawn.".
+               format(mn))
+        can_draw_figure=False
+    else:
+        can_draw_figure=True
+
+    if not output_the_contour and not return_figure_object:
+        fig = None
+    else:
+        if can_draw_figure:
+            fig = draw_contour(X, Z, M, levels, plot_title, x_step, z_step,
+                             mirror_x, mirror_z, return_figure_object, fig_size=fig_size);
+        else:
+            fig = None
+
+#     exit()
+    if return_arrays:
+        if output_the_contour:
+            if return_figure_object:
+                return X, Z, M, levels, fig
+            else: # return_figure_object=False
+                display(fig)
+                return X, Z, M, levels
+        else:  #output_the_contour=False
+            if return_figure_object:
+                return X, Z, M, levels, fig
+            else: # return_figure_object=False
+                return X, Z, M, levels
+    else:  #return_arrays=False
+        if output_the_contour:
+            if return_figure_object:
+                return fig
+            else: # return_figure_object=False
+                display(fig)
+        else:  #output_the_contour=False
+            if return_figure_object:
+                return fig
+
+
+# In[196]:
+
+
+def draw_full_contour2(data_frame,variable=0, time_step=180, grid= 0.5,
+                      crosses=35., tol=10., section= 'x', levels=None,
+                      plot_title="ElNesr cross sectional contour map",
+                      return_arrays=True, x_step=None, z_step=None,
+                      mirror_x=False, mirror_z=False, is2d=False,
+                      output_the_contour=True, is_axisymmetric=False,
+                      return_figure_object=False, fig_size=(18, 7),
+                      get_two_arrays=False, proceed_with_array_number=0):
+
+    '''
+    Either (1) set the return_arrays to True and use on right
+                hand side of equal sign,
+    OR     (2) set the return_arrays to False and use the function as is.
+    Examples:
+    (1)
+       arrays = draw_full_contour(data_frame,variable, time_step, grid,
+                                   crosses, tol, section)
+       It will draws the chart AND sets arrays=X, Z, M, levels
+    (2)
+       draw_full_contour(data_frame,variable, time_step, grid, crosses,
+                           tol, section, return_arrays=False)
+    if get_two_arrays ==True, then it will return two datasets:
+            one as the normal dataframe,
+            and one as half the dataframe(for axi compare).
+            (This happens only of the df is pXZ)
+            for now, the figures will be drawn using the normal (first) array only.
+            We may change this in the future.
+    '''
+#     print('is2d=', is2d)
+    packed_grid_values = get_grid_values(data_frame,
+                                 variable,
+                                 time_step, grid, crosses,
+                                 tol, section, is2d=is2d,
+                                 is_axisymmetric=is_axisymmetric,
+                                 get_two_arrays=get_two_arrays)
+    if not get_two_arrays:
+        X, Z, M, x_vals, z_vals = packed_grid_values
+    else:
+        X, Z, M, x_vals, z_vals = packed_grid_values[0]
     # print(x_vals.shape, z_vals.shape, X.shape, Z.shape, M.shape)
     if levels is None:
         levels = get_legend_range(np.nanmin(M),np.nanmax(M))#np.arange(0.15, 0.42, 0.03)
@@ -1478,18 +1808,19 @@ def integrate_volume(sX, sZ, sM, method='Simp', get_average=False,
 # In[24]:
 
 
-def draw_difference(arr1, arr2, scale_from=0, custom_levels=None,
+def draw_difference(arr1x, arr2x, scale_from=0, custom_levels=None,
                     x_step=10., z_step=25., mirror_x=False, mirror_z=False, 
                     calculate_volume=False, calculate_average=False, 
                     no_contours=False, separate_negatives=False,
                     calculate_volume_percent=False,
-                    return_calculations=True, return_figure_object=False):
+                    return_calculations=True, return_figure_object=False, fig_size=(18,7),
+                    passed_arrays_are_axi=(False, False)):
     """
     A function that calculates the difference between two arrays. 
     Main inputs:
     arr1, arr2: the two arrays that will calculate the difference from each other,
                     Each array shoud be a tuple of (X, Z, M, levels),  
-                    all should be nupy arrays of the same size,
+                    all should be numpy arrays of the same size,
                     the difference will be calculated (arr1-arr2)
     scale_from: The levels of the contour will be taken from arr1, unless 
                     this argument is adjusted to be = 2, 
@@ -1548,10 +1879,84 @@ def draw_difference(arr1, arr2, scale_from=0, custom_levels=None,
             d- a tuple of (p, n, t), where each of p, n, t  is
                   of the form(vol_diff/vol_base) for 
                   positives, negatives, and totals respectively.
-                
+
+    passed_arrays_are_axi a tuple of two booleans,by default=(False, False)
+        reflect the types of passed arrays, if anyone is axisemmetric, its place is True
+        the tuple arrangement is similar to the passed arrays  arr1, arr2.
+
     If both calculate_volume=False, and no_contours=False, 
     it will return None with a warning
     """
+    # First, we have to check if the arrays are of equal sizes,
+    # If not, then the largest should be truncated to the smallest size.
+#     print(type(arr1x), type(arr2x))
+#     print(len(arr1x), len(arr2x))
+    arr1, arr2 = list(arr1x), list(arr2x)
+#     print(type(arr1), type(arr2))
+#     print(len(arr1), len(arr2))
+
+#     for arrx in (arr1, arr2):
+#         for item in arrx:
+#             print (item.shape, end="; ")
+#         print()
+# #     return 1,2,3,4,5,"Done for now"
+
+    change = []
+    item1, item2 = arr1[0].shape, arr2[0].shape
+
+    if item1 != item2:
+        for k in range(len(item1)):
+            if item1[k] != item2[k]:
+                if item1[k] < item2[k]:
+                    change.append(("arr2", k, item1[k], item1, item2))
+                else:
+                    change.append(("arr1", k, item2[k], item1, item2))
+
+    if len(change)>0:
+#         print ('change: ',change)
+        change = list(set(change)) # to remove duplicates
+#         print ('change: ',change)
+        for case in change:
+            arrx, ax,  dimens, _ , __ = case
+#             print ('\nfor the case: ', case)
+            if isinstance(dimens, tuple):
+                    print ('dimens is a tuple = ', dimens)
+                    dimens=dimens[0]
+
+            if ax == 0:
+                # if it is Z axis, we will take the bottom rows only because
+                # Z starts negative to zero, and we want to keep the zero row.
+
+                for item in (0,1,2,4):
+                    # the first three items are 2D arrays (Z, X), while the fourth
+                    # and fifth are 1D arrays of (X,), (Z,) respectively
+                    if arrx == "arr2":
+                        arr2[item] = arr2[item][dimens+1:,...]
+                    else:
+                        arr1[item] = arr1[item][dimens+1:,...]
+
+            else: # ax=1
+                # for the X axis, we want to keep the right part.
+                for item in (0,1,2,3):
+                    if arrx == "arr2":
+#                         print ('item = ', item)
+#                         print(type(arr2[item]))
+#                         print(arr2[item].shape)
+#                         print(dimens + 1)
+                        arr2[item] = arr2[item][..., :dimens]
+#                         print ('this item was done successfully')
+                    else:
+                        arr1[item] = arr1[item][..., :dimens]
+
+#     for arrx in (arr1, arr2):
+#         for item in arrx:
+#             print (item.shape, end="; ")
+#         print()
+#     print ('-------------------------------')
+#     return 1,2,3,4,5,"Done for now"
+#     print(type(arr1), type(arr2))
+#     print(len(arr1), len(arr2))
+
     # To draw diffecence between two contour maps
     if scale_from ==2:
         _x, _z, _m , _levels= arr2
@@ -1568,14 +1973,14 @@ def draw_difference(arr1, arr2, scale_from=0, custom_levels=None,
                          plot_title=_ti,
                          x_step=x_step, z_step=z_step, 
                          mirror_x=mirror_x, mirror_z=mirror_z,
-                         return_figure_object=return_figure_object);
+                         return_figure_object=return_figure_object, fig_size=fig_size);
         else:
             _ti="Difference between two contours, Normal scale"
             fig = draw_contour(_x, _z, difference_matrix, levels=_levels,
                          plot_title=_ti,
                          x_step=x_step, z_step=z_step, 
                          mirror_x=mirror_x, mirror_z=mirror_z,
-                         return_figure_object=return_figure_object);
+                         return_figure_object=return_figure_object, fig_size=fig_size);
     if not return_calculations and return_figure_object:
         return fig
     
@@ -2110,174 +2515,10 @@ def print_date_and_time():
 # ===========================================================
 # ==== Fifth, exporting PNG cross sections of dataframes ====
 # ===========================================================
-def export_png_pictures(file_names,dict_3d, df2d, df3d, sections, time_steps, figput,
-                                       variable=0, section='y', tol= 10.,
-                                      grid= 0.25, levels= get_legend_range(0.05, 0.45)):
-
-    tb="  "
-    # Looping through all 3D files and 2D files
-    case_number = -1
-    for i, data_frame_3d in enumerate(df3d): #[:1]):######
-
-        name3d= file_names[dict_3d[i]]
-
-        # Finding the characteristics of the 3D file
-        # if the file is named 'pXZ_3D_sub_sand_cyl_2f.CSV'
-        # it will be ['pXZ', '3D', 'sub', 'sand', 'cyl', '2f']
-        name_parts_3d=name3d[:-4].replace("_", " ").split()
-        np3d = name_parts_3d
-        name3D_mod = '_'.join([np3d[3], np3d[1], np3d[0], np3d[2], np3d[4], np3d[5]])
-        # Check if the *3D contour* is axisymmetric
-        # THis will result in splitting the 3d contour in half to show only
-        # the right quarter
-        if name_parts_3d[0]=='Axi':
-            axisym=True
-        else:
-            axisym=False
-
-        print('{}-For 3D file: {}'.format(i, name3d[:-4]))
-        # Drawing contours of selected timesteps
-        # for the axisymmetric section, we want only the middle crossection
-        # cross_sections = sections[dict_3d[i]][0] if axisym else sections[dict_3d[i]]
-        cross_sections = sections[dict_3d[i]]
-        for crosses in cross_sections: #[:1]:######
-            for tt, time_step in enumerate(time_steps[dict_3d[i]][1:]): ########## [1:2]
-                # Plotting and calculating the 3D file
-                fig3D_name= '{}__t{}c{}'.format(name3D_mod,tt,int(crosses))
-                print(tb,'Cross section {} and timestep {}'.format(crosses, time_step), end=' ...')
-                plot_title = "Cross sectional contour of {} after time value={}.                 CS@ {} direction, crossing at {}={} cm".                            format({0:'Theta', 1:'Head'}[variable], time_step,
-                                  {'x': 'Y-Z', 'y':'X-Z'}[section], section, crosses)
-                # cont_y3D will hold a tuple of (X, Y, Z)
-                if os.path.isfile(os.path.join(figput, '{}.png'.format(fig3D_name))):
-                    print('EXISTS, the 3D file {} and its followers will be excluded'.format(fig3D_name))
-                    continue
-                    # No further commands will be processed for 2D and differences.
-
-                try:
-                    cont_y3D_full = draw_full_contour(data_frame_3d,variable, time_step,
-                                     grid, crosses, tol, section,levels,
-                                     plot_title, x_step=15, z_step=25,
-                                     mirror_x=not axisym, mirror_z=False,
-                                     is2d=False, output_the_contour=False,
-                                     is_axisymmetric=axisym,
-                                     return_arrays=True,
-                                     return_figure_object=True)
-                except:
-                    print('ERROR, while processing the 3D file {}.'.format(fig3D_name))
-                    # No further commands will be processed for 2D and differences.
-                    continue
-                try:
-                    #cont_y3D_full is X, Z, M, levels, fig
-                    cont_y3D = cont_y3D_full [:-1]
-                    fig_3D = cont_y3D_full [ -1]
-                    fig_3D.savefig(os.path.join(figput, '{}.png'.format(fig3D_name)))
-                    print('Done.')
-                except:
-                    print('ERROR, while saving the 3D file {}.'.format(fig3D_name))
-                    # Only the 3D PNG is not saved, but the 2D calculation will continue.
-
-                # Plotting and calculating the 2D files
-                for j, data_frame_2d in enumerate(df2d): #[:1]):#######
-                    name2d=file_names[j]
-                    # be sure the 2D file and the 3D file match each other
-                    name_parts_2d=name2d[:-4].replace("_", " ").split()
-                    np2d=name_parts_2d
-                    name2D_mod = '_'.join([np2d[3], np2d[1], np2d[0],
-                                           np2d[2], np2d[4], np2d[5], '_t{}'.format(tt)])
-                    fig2Dpath = os.path.join(figput, '{}.png'.format(name2D_mod))
-                    fail = False
-                    for part in [0, 2, 3]:# axi/pxz, sub/srf, soil_tex
-                        if name_parts_3d[part] != name_parts_2d[part]:
-                            fail = True
-                            pass
-                    if fail:
-                        # Continue the loop without processing further
-                        continue
-                    plot_title = "2D cross sectional contour of {} "
-                    plot_title += "after time value={}.".                        format({0:'Theta', 1:'Head'}[variable], time_step)
-                    # cont will hold a tuple of (X, Y, Z)
-                    print(tb*2,'{}-For the 2D file: {}'.format(j,name2d[:-4]), end=' ...')
-                    try:
-                        cont_y2d_full = draw_full_contour(data_frame_2d,variable,
-                                         time_step, grid, crosses, tol, section,
-                                         levels, plot_title, x_step=15, z_step=25,
-                                         mirror_x=not axisym, mirror_z=False,
-                                         is2d=True, output_the_contour=False,
-                                         return_arrays=True,
-                                         return_figure_object=True)
-                    except:
-                        print('ERROR, while processing the 2D file {}.'.format(name2D_mod))
-                        # No further commands will be processed for differences.
-                        continue
-                    try:
-                        #cont_y2d_full is X, Z, M, levels, fig
-                        cont_y2d = cont_y2d_full [:-1]
-                        fig_2D   = cont_y2d_full [ -1]
-                        if not os.path.isfile(fig2Dpath):
-                            fig_2D.savefig(fig2Dpath)
-                            print ('Done')
-                        else:
-                            print('{} is found'.format(name2D_mod))
-                    except:
-                        print('ERROR, while saving the 2D file {}.'.format(name2D_mod))
-                        # Only the 2D PNG is not saved, but the difference calculation will continue.
-                        pass
-
-                    # custom_levels=get_legend_range(-.1, 0.2),
-                    # custom_levels=None,
-
-                    print(tb*3,'The difference figure ', end=' ...')
-                    fig_dif_name = 'dif_{}_{}'.format(fig3D_name, name2d[16:-4])
-
-                    fig_dif = None
-                    try:
-                        fig_dif =  draw_difference(cont_y3D, cont_y2d, scale_from=0,
-                                      custom_levels=get_legend_range(-.3, 0.3),
-                                      mirror_x=not axisym, calculate_volume=False,
-                                      calculate_average=False, no_contours=False,
-                                      separate_negatives=False,
-                                      calculate_volume_percent= False,
-                                      return_calculations=False,
-                                      return_figure_object=True)
-                    except:
-                        print('ERROR, while processing the DIF file {}.'.format(fig_dif_name))
-                        continue
-                    try:
-                        if not fig_dif is None:
-                            fig_dif_path = os.path.join(figput, '{}.png'.format(fig_dif_name))
-                            if not os.path.isfile(fig_dif_path):
-                                fig_dif.savefig(fig_dif_path)
-                                print ('Done')
-                            else:
-                                print('{} is found'.format(fig_dif_name))
-                        else:
-                            print('Fail.')
-                    except:
-                        print('ERROR, while saving the DIF file {}.'.format(fig_dif_name))
-                    pass
-                pass
-            pass
-        pass
-    print('==============================================')
-    print('All the files were processed as printed above.')
-    print('==============================================')
-    pass
-
-# export_png_pictures()
-
-
-# In[38]:
-
-
-# ===========================================================
-# ==== Fifth, exporting PNG cross sections of dataframes ====
-# ===========================================================
 # ============ More efficient handling to the files =========
 # ===========================================================
 
-def export_png_pictures_more_efficient(file_names,dict_3d, df2d, df3d, sections,
-                                       time_steps, figput,
-                                       variable=0, section='y', tol= 10.,
+def export_png_pictures_more_efficient(variable=0, section='y', tol= 10.,
                                       grid= 0.25, levels= get_legend_range(0.05, 0.45)):
 
     tb="  "
@@ -2333,7 +2574,6 @@ def export_png_pictures_more_efficient(file_names,dict_3d, df2d, df3d, sections,
                     print('ERROR, while processing the 3D file {}.'.format(fig3D_name))
                     # No further commands will be processed for 2D and differences.
                     continue
-
                 try:
                     #cont_y3D_full is X, Z, M, levels, fig
                     cont_y3D = cont_y3D_full [:-1]
@@ -2345,7 +2585,6 @@ def export_png_pictures_more_efficient(file_names,dict_3d, df2d, df3d, sections,
                     # Only the 3D PNG is not saved, but the 2D calculation will continue.
 
                 # Plotting and calculating the 2D files
-
                 for j, data_frame_2d in enumerate(df2d): #[:1]):#######
                     name2d=file_names[j]
                     # be sure the 2D file and the 3D file match each other
@@ -2438,6 +2677,398 @@ def export_png_pictures_more_efficient(file_names,dict_3d, df2d, df3d, sections,
     pass
 
 # export_png_pictures_more_efficient()
+
+
+# <div class="alert alert-block alert-warning">
+# # Testing the previous functions to confirm they work fine.
+
+# #### *REMOVED, can be found at HydrusGetAndDraw31 and earlier*
+
+# <div class="alert alert-block alert-warning">
+# # Applying the previous works to draw the desired contour
+
+# **Check the dataframe headers**
+
+# # The application of all functions
+# ## (on the testing dataset)
+
+# #### *REMOVED, can be found at HydrusGetAndDraw31 and earlier*
+
+# ## Applications on real datasets
+
+# #### *REMOVED, can be found at HydrusGetAndDraw31 and earlier*
+
+# # The gross analysis of sand files
+
+# #### *REMOVED, can be found at HydrusGetAndDraw31 and earlier*
+
+# # The gross analysis of ALL TEXTURES
+
+# In[ ]:
+
+
+def do_analysis_stages():
+    source_folder = 'C:/Users/DrNesr/Documents/Current2'
+
+    # HYDRUS_TXT = 'C:/Users/DrNesr/Documents/HYDRUS_TXT/Em2Lph'
+    # HYDRUS_CSV = 'C:/Users/DrNesr/Documents/HYDRUS_CSV/Em2Lph'
+    # HYDRUS_PNG = 'C:/Users/DrNesr/Documents/HYDRUS_PNG/Em2Lph'
+    #
+    # source = HYDRUS_TXT
+    # output = HYDRUS_CSV
+    # figput = HYDRUS_PNG
+
+    # Stage 1.1 (uncomment if not done yet)
+    # ---------------------------------------
+    # move_hydrus_txt_to_folder(source_folder, source)
+
+    # Stage 1.2 (uncomment if not done yet)
+    # ---------------------------------------
+    # convert_HYDRUS_files_to_CSV()
+
+    # Stage 1.3 (uncomment if not done yet)
+    # ---------------------------------------
+    # missing_folder_name = 'pXZ_3D_srf_Silt_sht_rO1f'
+    # add_missing_csv(missing_folder_name)
+
+    # Stage 1.4 (uncomment if not done yet)
+    # ---------------------------------------
+    # check_file_list(source)
+
+    # Stage 2.0 (A MUST for next stages)
+    # ---------------------------------------
+    # df2d, df3d, file_names, dict_3d, dims, time_steps, sections = get_dataframes_from_csv(source, output)
+
+    # Stage 4.0 (uncomment if not done yet)
+    # ---------------------------------------
+    # out_data_frame, grid_res_df = calculate_gridded_and_full_volumes(file_names, df3d, df2d, dict_3d, sections, time_steps)
+    # title_print='| n |Axi|sub|soil|elm|emtr|CS | TS |PosVol| NegVol \
+    #     | TotVol | PosAvg | NegAvg  |  TotAvg |PsV_Pr|NgV_Pr|TtV_Pr|  3D_filename  |'
+
+    # out_data_frame=pd.DataFrame(out_frame, columns=title_print.replace('|',' ').split())
+    # out_data_frame.to_csv(os.path.join(output, 'AnalysisResultsGrossFull_New.CSV'))
+
+    # grid_res_df.to_csv(os.path.join(output, 'AnalysisResultsGrossGridded_New.CSV'))
+    # grid_res_df.head(), out_data_frame.head()
+
+    # print_date_and_time()
+
+    # Stage 5.0 (uncomment if not done yet)
+    # ---------------------------------------
+    # export_png_pictures(file_names, df3d, df2d,
+    #                         dict_3d,sections, time_steps, figput
+    # export_png_pictures_more_efficient(file_names, df3d, df2d,
+    #                                    dict_3d,sections, time_steps, figput)
+
+    # In[ ]:
+
+    # export_png_pictures_more_efficient(file_names, df3d, df2d,
+    #                                    dict_3d,sections, time_steps, figput)
+    pass
+
+
+# In[ ]:
+
+
+def do_export_pngs():
+    warnings.filterwarnings("ignore")
+    # HYDRUS_TXT = 'C:/Users/DrNesr/Documents/HYDRUS_TXT/Em4Lph'
+    # HYDRUS_CSV = 'C:/Users/DrNesr/Documents/HYDRUS_CSV/Em4Lph'
+    # HYDRUS_PNG = 'C:/Users/DrNesr/Documents/HYDRUS_PNG/Em4Lph'
+    HYDRUS_TXT = 'C:/Users/DrNesr/Documents/HYDRUS_TXT/Em2Lph'
+    HYDRUS_CSV = 'C:/Users/DrNesr/Documents/HYDRUS_CSV/Em2Lph'
+    HYDRUS_PNG = 'C:/Users/DrNesr/Documents/HYDRUS_PNG/Em2Lph'
+    source = HYDRUS_TXT
+    output = HYDRUS_CSV
+    figput = HYDRUS_PNG
+    df2d, df3d, file_names, dict_3d, dims, time_steps, sections = get_dataframes_from_csv(source, output)
+    export_png_pictures_more_efficient(file_names, df3d, df2d,
+                                       dict_3d, sections, time_steps, figput)
+
+
+# In[88]:
+
+
+# In the name of Allah,
+
+# import warnings
+# warnings.filterwarnings("ignore")
+#
+# # To draw all contour maps for all timesteps at specefic cross section
+# data_frame = pd.read_csv('pXZ_3D_srf_sand_sms_1m.CSV')
+# variable   = 0 # Theta
+# time_step  = 180
+# grid       = 0.25 # cm
+# crosses    = 60.  #cm0)]
+# tol        = 10.
+# section    ='y'
+# # draw_full_contour(data_frame,variable, time_step, grid, crosses, tol, section)
+# # Drawing contours of all timesteps
+# levels = get_legend_range(0.05, 0.45)
+# _ti = "Cross sectional contour of {} after time value={}. CS@ {} direction, crossing at {}={} cm"
+# for time_step in get_available_timesteps(data_frame)[1:]:
+#     plot_title = _ti.format({0:'Theta', 1:'Head'}[variable], time_step,
+#                       {'x': 'Y-Z', 'y':'X-Z'}[section], section, crosses)
+#     draw_full_contour(data_frame,variable, time_step, grid, crosses, tol, section,
+#                       levels, plot_title, fig_size=(2+7,12))
+# # double click the output pane to show the results
+#
+#
+# # In[97]:
+#
+#
+# # To draw all contour maps for all cross sections at a specefic timestep
+# data_frame = pd.read_csv('pXZ_3D_srf_sand_sms_1m.CSV')
+# variable   = 0 # Theta
+# time_step  = 180
+# grid       = 0.25 # cm
+# crosses    = 60.  #cm0)]
+# tol        = 10.
+# section    ='y'
+# # draw_full_contour(data_frame,variable, time_step, grid, crosses, tol, section)
+# # Drawing contours of all timesteps
+# levels = get_legend_range(0.05, 0.45)
+# _ti = "Cross sectional contour of {} after time value={}. CS@ {} direction, crossing at {}={} cm"
+# dims= get_full_dimensions(data_frame)[section]
+# for crosses in np.arange(dims[1]/8, dims[1], dims[1]/8):
+#     plot_title = _ti.format({0:'Theta', 1:'Head'}[variable], time_step,
+#                       {'x': 'Y-Z', 'y':'X-Z'}[section], section, crosses)
+#     draw_full_contour(data_frame,variable, time_step, grid, crosses, tol, section,
+#                       levels, plot_title, fig_size=(2+7,12))
+
+
+# In[98]:
+
+
+
+# In[38]:
+
+
+# ===========================================================
+# ==== Fifth, exporting PNG cross sections of dataframes ====
+# ===========================================================
+# ============ More efficient handling to the files =========
+# ===========================================================
+
+
+# def calculate_all_data_with_axi_pxz():
+def calculate_all_data_with_axi_pxz(variable=0, section='y', tol= 10.,
+                                      grid= 0.25, levels= get_legend_range(0.05, 0.45)):
+    # Temporary value
+    crosses = 0
+    # a storage for the 3d cross sections and dataframes
+    vault_3d = {}
+
+
+    # Here we used "w" letter in our argument, which indicates write and the plus
+    # sign that means it will create a file if it does not exist in library
+    # The available option beside "w" are "r" for read and "a" for append and
+    # plus sign means if it is not there then create it
+    # Create files to write line by line
+    dtfmla= datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+    path_full = os.path.join(output, 'Analysis_full_nL{}.CSV'.format(dtfmla))
+    path_grid = os.path.join(output, 'Analysis_grid_nL{}.CSV'.format(dtfmla))
+    title1 = "n, Axi, sub, soil, elm, emtr, CS, TS, PosVol, NegVol, TotVol, "              "PosAvg, NegAvg, TotAvg, PsV_Pr, NgV_Pr, TtV_Pr, 3D_filename\n"
+    title2 = "x_cord, z_cord, x_average, z_average, m_count, m_average, m_min, m_max, "             "m_std, element_area, dif_vol_positive, dif_avg_positive, dif_vol_negative, "             "dif_avg_negative, dif_vol_all, dif_avg_all, pos_vol_ratio%, "             "neg_vol_ratio%, full_vol_ratio%, case_number\n"
+    with open (path_full, 'w', newline='') as f_full, open(path_grid, 'w', newline='') as f_grid:
+    #     f_full = open (os.path.join(output, 'Analysis_full_nL{}.CSV'.format(dtfmla)), 'w+')
+    #     f_grid = open (os.path.join(output, 'Analysis_grid_nL{}.CSV'.format(dtfmla)), 'w+')
+        # Defining titles
+
+        # Writing titles
+        f_full.write(title1)
+        f_grid.write(title2)
+        # Preparing for outputs
+        write1 = csv.writer(f_full, delimiter=",")
+        write2 = csv.writer(f_grid, delimiter=",")
+
+    #     out_frame = []
+        # the gridded results dataframe
+    #     grid_res_df = pd.DataFrame()
+        valid_time_steps = time_steps[dict_3d[1]][1:]
+
+        # Starting to loop with 2D files then 3D files
+        case_number = -1
+        for j, data_frame_2d in enumerate(df2d): #[:1]):#######
+            name2d = file_names[j]
+            # be sure the 2D file and the 3D file match each other
+            name_parts_2d = name2d[:-4].split("_")
+            # part5 is the flux form
+            part5 = name_parts_2d[5] if len(
+                    name_parts_2d[5])<=3 else name_parts_2d[5][1:4]
+            if name_parts_2d[0]=='Axi':
+                axisym=True
+                the_2d_is_axi = True
+            else:
+                axisym=False
+                the_2d_is_axi = False
+                pass
+            for time_step in valid_time_steps:
+                plot_title = "2D cross sectional contour of {} "                             "after time value={}.".                    format({0:'Theta', 1:'Head'}[variable], time_step)
+                # cont will hold a tuple of (X, Y, Z)
+    #             cont_y2d = draw_full_contour(data_frame_2d,variable,
+    #                                          time_step, grid, crosses,
+    #                                          tol, section,
+    #                                          levels, plot_title,
+    #                                          x_step=15, z_step=25,
+    #                                          mirror_x=not axisym, mirror_z=False,
+    #                                          is2d=True,
+    #                                          output_the_contour=False,
+    #                                          return_arrays=True,
+    #                                          return_figure_object=False)
+                # if the dataframe for pXZ, then get two arrays
+
+    #             return data_frame_2d
+    #             time_in = timeit.default_timer()
+                packed_y2d = get_packed_arrays(data_frame_2d,variable,
+                                             time_step, grid, crosses,
+                                             tol, section, is2d=True,
+                                             is_axisymmetric=axisym,
+                                             levels = levels,
+                                             get_two_arrays=not(axisym))
+
+    #             print(type(packed_y2d),len(packed_y2d))
+    #             print('Elapsed time of packed_y2d: {} s'.format(timeit.default_timer() - time_in))
+
+                # Now looping through the 3D simulations
+                for i, data_frame_3d in enumerate(df3d): #[:1]):######
+
+                    name3d= file_names[dict_3d[i]]
+                    # if the file is named 'pXZ_3D_sub_sand_cyl_2f.CSV'
+                    # it will be ['pXZ', '3D', 'sub', 'sand', 'cyl', '2f']
+                    name_parts_3d=name3d[:-4].split("_")
+                    fail = False
+                    for part in [2, 3]:# sub/srf, soil_tex
+                        if name_parts_3d[part] != name_parts_2d[part]:
+                            fail = True
+                            pass
+                    if fail:
+                        # Continue the loop without processing further
+                        continue
+
+                    # Check if the *3D contour* is axisymmetric
+                    # THis will result in splitting the 3d contour in half to show only
+                    # the right quarter
+                    if name_parts_3d[0]=='Axi':
+                        axisym=True
+                        the_3d_is_axi = True
+                    else:
+                        axisym=False
+                        the_3d_is_axi = False
+                        pass
+
+
+                    # Drawing contours of selected timesteps
+                    # for the axisymmetric section, we want only the middle crossection
+                    # cross_sections = sections[dict_3d[i]][0] if axisym else sections[dict_3d[i]]
+                    cross_sections = sections[dict_3d[i]]
+                    for crosses in cross_sections: #[:1]:######
+                        time_in = timeit.default_timer()
+                        # if the case exist in the vault, then read it, else calculate then store
+                        if (name3d, time_step, crosses) in vault_3d:
+                            packed_y3d = vault_3d[(name3d, time_step, crosses)]
+                        else:
+                            packed_y3d = get_packed_arrays(data_frame_3d, variable, time_step,
+                                                       grid, crosses,  tol, section,
+                                                       is2d=False, is_axisymmetric=axisym,
+                                                       levels = levels,
+                                                       get_two_arrays=not(axisym))
+    #                         print(type(packed_y3d),len(packed_y3d))
+                            vault_3d[(name3d, time_step, crosses)] = packed_y3d
+    #                     print('Elapsed time of packed_y3d: {} s'.format(timeit.default_timer() - time_in))
+
+                        if the_3d_is_axi and not the_2d_is_axi:
+                            cont_y3d, cont_y2d = packed_y3d, packed_y2d[1]
+                        elif the_2d_is_axi and not the_3d_is_axi:
+                            cont_y3d, cont_y2d = packed_y3d[1], packed_y2d
+                        elif (not the_2d_is_axi) and (not the_3d_is_axi):  # both are pXZ
+                            cont_y3d, cont_y2d = packed_y3d[0], packed_y2d[0]
+                        else: # both are axi
+                            cont_y3d, cont_y2d = packed_y3d, packed_y2d
+
+    #                     time_in = timeit.default_timer()
+
+    #                     print(type(cont_y3d), type(cont_y2d))
+    #                     print(len(cont_y3d), len(cont_y2d))
+
+                        Tp, Tn, Tt, Vp, Vn, Vt =  draw_difference(cont_y3d, cont_y2d,
+                                                      scale_from=0,
+                                                      custom_levels=get_legend_range(
+                                                          -.1, 0.2),
+                                                      mirror_x=not axisym,
+                                                      calculate_volume=True,
+                                                      calculate_average=True,
+                                                      no_contours=True,
+                                                      separate_negatives=True,
+                                                      calculate_volume_percent= True,
+                                                      return_calculations=True,
+                                                      return_figure_object=False)
+    #                     print('Elapsed time of draw_difference: {} s'.format(timeit.default_timer() - time_in))
+    #                     print(name2d, name3d, time_step, crosses, timeit.default_timer() - time_in)
+    #                     continue
+
+
+                        case_number += 1
+                        outs = [case_number, name_parts_2d[0], name_parts_2d[2],
+                                name_parts_2d[3], name_parts_2d[4], part5, crosses,
+                                time_step, Tp[0], Tn[0], Tt[0], Tp[1],Tn[1], Tt[1],
+                                Vp*100., Vn*100., Vt*100., name3d[:-4]]
+                        print (len(outs), outs[:3], outs[-3:], end='; ')
+                        write1.writerow(outs)
+
+                        # Create the gridded difference dataframe
+                        tab_df = get_results_for_grid(cont_y3d, cont_y2d)
+                        tab_df['case_number']=case_number
+                        # the tab_df is a multi-row dataframe, we want it as a list of lists
+                        print(tab_df.shape)
+                        gridded_results = tab_df.values.tolist()
+                        write2.writerows(gridded_results)
+
+                        print(case_number, name2d, name3d, part5, crosses, time_step, timeit.default_timer() - time_in)
+                        pass
+                    pass
+                pass
+            pass
+        pass
+
+
+# # In[ ]:
+#
+#
+# calculate_all_data_with_axi_pxz()
+#
+#
+# # In[160]:
+#
+#
+# file_names
+#
+#
+# # In[162]:
+#
+#
+# d2=df2d[0]
+# d3= df3d[0]
+# display((d2.shape, file_names[0]), d2.sample(4), (d3.shape, file_names[dict_3d[0]]), d3.sample(4))
+#
+#
+# # In[163]:
+#
+#
+# sections[dict_3d[0]]
+#
+#
+# # In[167]:
+#
+#
+# get_packed_arrays(d2,variable=0, time_step=15, grid= 0.25,
+#                       crosses=0., tol=10., section= 'y', is2d=True,
+#                       is_axisymmetric=True, levels=None,
+#                       get_two_arrays=False)
+#
+#
+# # In[223]:
+
 
 
 

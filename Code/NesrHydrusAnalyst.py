@@ -40,6 +40,7 @@ import matplotlib.cm as cm
 import random
 import glob
 import shutil
+#from IPython import display
 # from matplotlib import rc
 # rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 # ## for Palatino and other serif fonts use:
@@ -1076,7 +1077,8 @@ def draw_contour(X, Z, M, levels=None,
     plt.title(plot_title)
     plt.ylabel("Depth (cm)")
     cols = plt.cm.Accent_r(CS_lines.norm(CS_lines.levels))
-    plt.clabel(CS_lines, linewidths=4, fmt='%2.2f', fontsize='x-large', 
+    #plt.clabel(CS_lines, linewidths=4, fmt='%2.2f', fontsize='x-large', 
+    plt.clabel(CS_lines, fmt='%2.2f', fontsize='x-large', 
                colors=cols, inline=True, inline_spacing=10)
     plt.colorbar(CS_fill)
 #     print(Z.min(), Z.max(), X.min(), X.max())
@@ -1234,8 +1236,8 @@ def draw_full_contour(data_frame,variable=0, time_step=180, grid= 0.5,
             if return_figure_object:
                 return X, Z, M, levels, fig
             else: # return_figure_object=False
-                # display(fig)
-                fig.show()
+                display(fig)
+                # fig.show()
                 return X, Z, M, levels
         else:  #output_the_contour=False
             if return_figure_object:
@@ -1247,8 +1249,8 @@ def draw_full_contour(data_frame,variable=0, time_step=180, grid= 0.5,
             if return_figure_object:
                 return fig
             else: # return_figure_object=False
-                # display(fig)
-                fig.show()
+                display(fig)
+                # fig.show()
         else:  #output_the_contour=False
             if return_figure_object:
                 return fig

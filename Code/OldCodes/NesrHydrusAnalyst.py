@@ -1826,7 +1826,7 @@ def move_hydrus_txt_to_folder(source_folder, HYDRUS_TXT):
 
 # To convert HYDRUS files to CSV
 def convert_HYDRUS_files_to_CSV(HYDRUS_TXT, HYDRUS_CSV):
-    retrieve_all_csv_files(HYDRUS_TXT, 
+    retrieve_all_csv_files(HYDRUS_TXT,
                        get='all',
                        retrieve_folders_only=False,
                        get_only_new=True,

@@ -909,9 +909,60 @@ def get_section_dataframes(source_df, axis_of_section='y', cross_at=20.,
 
 
 # In[13]:
+def get_grid_values(data_frame, variable=0, time_step=180, grid=0.5,
+                    crosses=35., tol=10., section='x',
+                    testing=False, is2d=False):
+    '''
 
+    '''
 
-def get_grid_values(data_frame, variable=0, time_step = 180, grid = 0.5, 
+    # Find the variable mask
+    v_mask = {0: 'Th', 1: 'H'}[variable]  # , 2:'V'
+    if testing: print(v_mask)
+
+    # first get the dataframe of the neighbors of the required cross-section
+    # (source_df, axis_of_section='y', cross_at=20., tolerance=15.,
+    #   output='before & after')
+    #     print('is2d from get_grid_values: ', is2d)
+    if is2d:
+        src = data_frame
+        scr_cols = [axs for axs in ['x', 'y', 'z'] if axs in data_frame.columns]
+        points = np.array(src[scr_cols])
+    else:
+        src = get_section_dataframes(data_frame, axis_of_section=section,
+                                     cross_at=crosses, tolerance=tol, output='full')
+        points = np.array(src[['x', 'y', 'z']])
+    z_values = np.array(src[['{}_T={}'.format(v_mask, time_step)]])
+    if testing: print('src shape:{}, points shape:{}, z_values shape::'.
+                      format(src.shape, points.shape, z_values.shape))
+    if testing: print(src[['{}_T={}'.format(v_mask, time_step)]].head())
+    # get the grid info
+    # (source_df, axis_of_section='y', grid_value=1., default_value=20., output_method='3D')
+    if is2d:
+        cs = get_section_grid(data_frame,
+                              axis_of_section='y', grid_value=grid,
+                              default_value=0., output_method='2D')
+    else:
+        cs = get_section_grid(data_frame, axis_of_section=section,
+                              grid_value=grid, default_value=crosses,
+                              output_method='3D')
+
+    requests = np.array(cs[0])
+    # x_vals, z_vals are the two used axes, regardless they are XY, XZ, or YZ
+    x_vals, z_vals = cs[1][0], cs[1][1]
+    if testing: print('requests shape:{}, x_vals shape:{}, z_vals shape:{}'.
+                      format(requests.shape, x_vals.shape, z_vals.shape))
+
+    X, Z = np.meshgrid(x_vals, z_vals)
+    #     M = griddata(points, z_values, requests).reshape((X.shape[1], X.shape[0])).T
+    if testing: print('points shape:{}, z_values shape:{}, requests shape:{}'.
+                      format(points.shape, z_values.shape, requests.shape))
+
+    M = griddata(points, z_values, requests).reshape((X.shape[1], X.shape[0])).T
+
+    return X, Z, M, x_vals, z_vals
+
+def get_grid_values33(data_frame, variable=0, time_step = 180, grid = 0.5,
                     crosses = 35., tol = 10., section ='x', 
                     testing=False, is2d=False, is_axisymmetric=False,
                     get_two_arrays=False):
@@ -950,9 +1001,9 @@ def get_grid_values(data_frame, variable=0, time_step = 180, grid = 0.5,
         else: # 3D
             src= get_section_dataframes(data_frame, axis_of_section=section,
                                         cross_at=crosses, tolerance=tol, output='full')
-            display(src.describe())
+            # display(src.describe())
             points = np.array(src[['x', 'y','z']])
-            display(points.shape)
+            # display(points.shape)
 
             if is_axisymmetric:
                 # if the simulation is Axisymmetric 3D, then take only the
@@ -962,14 +1013,14 @@ def get_grid_values(data_frame, variable=0, time_step = 180, grid = 0.5,
                 source_df=data_frame
                 pass
 
-            display(source_df.describe())
+            # display(source_df.describe())
 
             cs = get_section_grid(data_frame, axis_of_section=section,
                                   grid_value=grid, default_value=crosses,
                                   output_method='3D',
                                   is_axisymmetric=is_axisymmetric)
 
-            display(cs)
+            #display(cs)
 
             returns = get_z_frame_outputs(source_df, v_mask, time_step, cs, points)
             return returns
@@ -1174,7 +1225,29 @@ def get_legend_range(mn, mx):
 
 
 # In[19]:
-
+def get_fig_shape(data_frame, 
+                  selected_dim='y',
+                  max_height=8,
+                  extra_width=1):
+    '''
+    Returns a proportunal tuple contains the width and the height for a specific data_frame
+        If the data_frame is a 3D frame, then specify the slicing dimension as selected_dim, 
+        with default value as 'y', which returns a xz 2D dataframe.
+        the max_height is a limiting factor for the figure's shape, the width will vary, 
+        but the height will be as specified hers, with default value =8.
+        the width reflects the figure and the legend, that's why we add and extra_width of 1 
+        in most cases, else if specified otherwise.
+    '''
+    dims = get_full_dimensions(data_frame)
+    for dim, vals in dims.items():
+        mn, mx = vals
+        length = mx-mn
+        dims[dim] = length
+    sels = {d: dims[d] for d in dims.keys() if d != selected_dim}
+    fig_shape = np.array(list(sels.values()))  # [::-1]
+    fig_shape = np.ceil(fig_shape*max_height/fig_shape[1])
+    fig_shape[0] += extra_width
+    return tuple(fig_shape)
 
 def draw_contour(X, Z, M, levels=None, 
                  plot_title="ElNesr cross sectional contour map",

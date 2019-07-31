@@ -130,7 +130,7 @@ def read_hydrus_data(folder='Current', save_to_csv=True):
                 dft=pd.DataFrame(np.array(time_data,float),columns=['{}_T={}'.
                                                                     format(caption,t)])
                 if len(times_df) == 0:  # If it is the first timestep
-                    times_df = dft
+                    times_df = dft.copy()
                 else:  # Otherwise (for all other timesteps)
                     times_df = pd.concat([times_df, dft], axis=1)
                 # Change the start to the probable next timestem (if exist)
@@ -1146,7 +1146,10 @@ def get_full_dimensions(data_frame):
     for dim in ['x', 'y', 'z']:
         if dim in data_frame.columns:
             _t = data_frame[dim]
-            _t = _t.min(), _t.max() 
+            # try:
+            #     _t = _t.min(), _t.max()
+            # except:
+            _t = np.nanmin(_t), np.nanmax(_t)
             xyz[dim]=_t
     #     mems = list(filter(lambda x: x.find('h_T')>0, cols))
     return xyz
@@ -1355,20 +1358,24 @@ def draw_contour(X, Z, M, levels=None,
 #     print('mir_X draw_contour2: ', mirror_x, 'x_step: ', x_step)
     if mirror_x:
         if x_step is not None:
-            ticks, labels = adjust_mirrored_labels(X.min(),X.max(), x_step)
+            # ticks, labels = adjust_mirrored_labels(X.min(),X.max(), x_step)
+            ticks, labels = adjust_mirrored_labels(np.nanmin(X), np.nanmax(X), x_step)
 #             print(ticks, labels)
             plt.xticks(ticks, labels)
     else: # No Mirroring
         if x_step is not None:
-            plt.xticks(adjust_axis_labels(X.min(),X.max(), x_step))
+            # plt.xticks(adjust_axis_labels(X.min(),X.max(), x_step))
+            plt.xticks(adjust_axis_labels(np.nanmin(X), np.nanmax(X), x_step))
 
     if mirror_z:
         if z_step is not None:
-            ticks, labels = adjust_mirrored_labels(Z.min(),Z.max(), z_step)
+            # ticks, labels = adjust_mirrored_labels(Z.min(),Z.max(), z_step)
+            ticks, labels = adjust_mirrored_labels(np.nanmin(Z), np.nanmax(Z), z_step)
             plt.yticks(ticks, labels)
     else: # No Mirroring
         if z_step is not None:
-            plt.yticks(adjust_axis_labels(Z.min(),Z.max(), z_step))
+            # plt.yticks(adjust_axis_labels(Z.min(),Z.max(), z_step))
+            plt.yticks(adjust_axis_labels(np.nanmin(Z), np.nanmax(Z), z_step))
 #     ax=plt.axes()
     ax = plt.gca()
     ax.grid(True, zorder=0)
@@ -1751,7 +1758,7 @@ def draw_cross_sections(input_array, xs_array, zs_array, direction='z',
         depth_cs_df.head(10)
         xs =depth_df.columns
         ax = depth_cs_df.plot(figsize=(9,6), grid=True, colormap=col_map, 
-                              xlim=(xs.min(), xs.max()) )
+                              xlim=(np.nanmin(xs), np.nanmax(xs)) )#xlim=(xs.min(), xs.max()) )
         ax.set_ylabel(axis_label, fontsize=12)
         ax.set_xlabel(r'Horizontal distance in {} direction $(cm)$'.
                       format(direction), fontsize=12)
@@ -1778,7 +1785,7 @@ def draw_cross_sections(input_array, xs_array, zs_array, direction='z',
         # ms =depth_df.values
         zs =depth_df.index
         ax = x_cs_df.plot(figsize=(6,8), grid=True, colormap=col_map,
-                          ylim=(zs.min(), zs.max())) #, xlim=(ms.min(), ms.max()) )
+                          ylim=(np.nanmin(zs), np.nanmax(zs))) #ylim=(zs.min(), zs.max()))#, xlim=(ms.min(), ms.max()) )
         ax.set_xlabel(axis_label, fontsize=12)
         _ti='The change in {} accross depth, at different horizontal distances'
         ax.set_ylabel(r'Depth under soil $(cm)$',fontsize=12)
@@ -1808,9 +1815,10 @@ def draw_cross_sections(input_array, xs_array, zs_array, direction='z',
     #Create the crossing list if none provided
     if crossed_at_list is None:
         if direction == 'x' or direction == 'y':
-            zx, zn = _z.max(), _z.min()
+            # zx, zn = _z.max(), _z.min()
+            zx, zn = np.nanmax(_z), np.nanmin(_z)#_z.min()
         elif direction == 'z':
-            zx, zn = _x.max(), _x.min()
+            zx, zn = np.nanmax(_x), np.nanmin(_x)#_x.max(), _x.min()
         step = (zx - zn)/number_of_sections
         cs_range = np.arange(zn, zx, step)
         if reduce_auto_list:
@@ -1870,7 +1878,8 @@ def integrate_volume(sX, sZ, sM, method='Simp', get_average=False,
         vol = 0.5 * (integrate.simps(integrate.simps(sM, sX, axis=1),sZ) 
                      + np.trapz(np.trapz(sM, sX, axis=1),sZ))
     if get_average:
-        Lx, Lz = (sX.max()-sX.min()), (sZ.max()-sZ.min())
+        # Lx, Lz = (sX.max()-sX.min()), (sZ.max()-sZ.min())
+        Lx, Lz = (np.nanmax(sX) - np.nanmin(sX)), (np.nanmax(sZ) - np.nanmin(sZ))
         area= Lx*Lz
         return vol, vol/area, area
     else:

@@ -13,7 +13,7 @@
 # In[1]:
 
 
-#@# get_ipython().run_cell_magic('javascript', '', '// resize ipython notebook output window\nIPython.OutputArea.auto_scroll_threshold = 1000;')
+# @# get_ipython().run_cell_magic('javascript', '', '// resize ipython notebook output window\nIPython.OutputArea.auto_scroll_threshold = 1000;')
 
 
 # In[30]:
@@ -22,15 +22,16 @@
 # Importing important libraries
 import numpy as np
 import pandas as pd
-import linecache #as lc
+import linecache  # as lc
 import math
 from scipy.interpolate import griddata
 import matplotlib.pyplot as plt
 import os
 # from decimal import Decimal, ROUND_CEILING
 import decimal
+
 float_formatter = lambda x: "%.3f" % x
-np.set_printoptions(formatter={'float_kind':float_formatter})
+np.set_printoptions(formatter={'float_kind': float_formatter})
 
 from scipy.signal import savgol_filter
 from scipy import integrate
@@ -40,14 +41,16 @@ import matplotlib.cm as cm
 import random
 import glob
 import shutil
-#from IPython import display
+
+
+# from IPython import display
 # from matplotlib import rc
 # rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 # ## for Palatino and other serif fonts use:
 # #rc('font',**{'family':'serif','serif':['Palatino']})
 # rc('text', usetex=True)
 
-#@# get_ipython().run_line_magic('matplotlib', 'inline')
+# @# get_ipython().run_line_magic('matplotlib', 'inline')
 
 
 # **Code for importing and converting HYDRUS output to CSV**
@@ -60,13 +63,15 @@ def get_df_from_csv(path, file_name):
     if os.path.isfile(_file):
         return pd.read_csv(_file)
     else:
-        print ('Warning, the given path does not contain such given file name,         or the path does not exist\n You provided the file name: {}\n ... and the         path as: {}'.format(file_name, path))
+        print(
+            'Warning, the given path does not contain such given file name,         or the path does not exist\n You provided the file name: {}\n ... and the         path as: {}'.format(
+                file_name, path))
 
 
 # In[4]:
 
 
-def read_hydrus_data(folder='Current', save_to_csv=True):
+def read_hydrus_data(folder='Current', save_to_csv=True, read_velocities=False):
     '''
     A function to read both Theat and H files from HYDRUS outputs, 
         then to:
@@ -77,31 +82,31 @@ def read_hydrus_data(folder='Current', save_to_csv=True):
         The option to save_to csv, default =True (Boolean)
     '''
     # Specify the source folder
-    if folder=='Current':
+    if folder == 'Current':
         read_dir = os.getcwd()
     else:
         read_dir = folder
-        
+
     # Finding number of nodes in the file
     mesh_file = os.path.join(read_dir, 'MESHTRIA.TXT')
-    num_cells = np.array(linecache.getline(mesh_file, 6).split(),int)[0]
+    num_cells = np.array(linecache.getline(mesh_file, 6).split(), int)[0]
     # Define dataframe titles
-    titles = ['n', 'x', 'y', 'z'] 
+    titles = ['n', 'x', 'y', 'z']
     # Define a list of coordinates
-    full_data = [[0,0,0,0]]
+    full_data = [[0, 0, 0, 0]]
     # Set a loop to geather all coordinates from MESHTRIA.TXT file
     for i in range(8, num_cells + 8):
-        full_data.append(np.array(linecache.getline(mesh_file, i).split(),float))
+        full_data.append(np.array(linecache.getline(mesh_file, i).split(), float))
     # Convert the list to numpy array then to a dataframe
     coordinates_df = pd.DataFrame(np.array(full_data), columns=titles)
+
     # Print head and tail of the dataframe to ensure correctness
     # pd.concat([coordinates_df.head(),coordinates_df.tail()])
-    
-    
+
     # -----------------------------#
     # To get data from all files   #
     # -----------------------------#
-    def get_data_from_file(filename='TH.TXT', caption = 'Theta'):
+    def get_data_from_file(filename='TH.TXT', main_caption='Theta'):
         '''
         Function to combine all values of a property to a single dataframe 
         inputs:
@@ -110,25 +115,38 @@ def read_hydrus_data(folder='Current', save_to_csv=True):
         where xxx is the timestep
         '''
         # compute number of lines for each timestep
-        num_lines = int(math.ceil(num_cells /10.))
+        num_lines = int(math.ceil(num_cells / 10.))
         time_steps_remaining = True  # Flag to see if the loop should continue or not.
         times_df = pd.DataFrame([])  # Empty dataframe
         time_loc_start = 2  # The starting cell of the timestep
+        # Check if it is a velocity file
+        processing_velocity = (filename == 'V.TXT')
         while time_steps_remaining:
             line_t = linecache.getline(filename, time_loc_start).split()
             # Check if it is the start of the timestep, otherwise exit
             if line_t[0] == 'Time':
                 t = int(line_t[2])
+                if processing_velocity:
+                    velocity_component = {'first': '1', 'second': '2', 'third': '3'}[line_t[5].strip()]
+                    caption = main_caption + velocity_component
+                else:
+                    caption = main_caption
                 # Finding the last line of the timestep
                 tim_loc_end = num_lines + time_loc_start + 2
                 # The starting time is always 0 because steps starts in 1 in HYDRUS
-                time_data = [0]  
+                time_data = [0]
                 # Create the timestep as one long list
                 for i in range(time_loc_start + 2, tim_loc_end):
                     time_data.extend(linecache.getline(filename, i).split())
                 # Convert the list to DataFrame
-                dft=pd.DataFrame(np.array(time_data,float),columns=['{}_T={}'.
-                                                                    format(caption,t)])
+                if processing_velocity:
+                    dft = pd.DataFrame(np.array(time_data, float),
+                                       columns=['{}_T{}'.format(caption,
+                                                                  velocity_component,
+                                                                  t)])
+                else:
+                    dft = pd.DataFrame(np.array(time_data, float),
+                                       columns=['{}_T{}'.format(caption, t)])
                 if len(times_df) == 0:  # If it is the first timestep
                     times_df = dft.copy()
                 else:  # Otherwise (for all other timesteps)
@@ -136,23 +154,26 @@ def read_hydrus_data(folder='Current', save_to_csv=True):
                 # Change the start to the probable next timestem (if exist)
                 time_loc_start = tim_loc_end + 1
                 time_steps_remaining = True if len(linecache.
-                                                   getline(filename, 
+                                                   getline(filename,
                                                            time_loc_start)) > 0 else False
                 # End IF
         return times_df
-    
+
     # Set the basic dataframe to the coordinates dataframe, to append to it.
     full_df = coordinates_df
     # Looping through the basic output files then to concatenate them all
-    for prop in [('TH.TXT','Th'), ('H.TXT','H')]:#, ('V.TXT', 'V')]:
+    properties = [('TH.TXT', 'Th'), ('H.TXT', 'H'), ('V.TXT', 'V')]
+    if not read_velocities:
+        properties = properties[:-1]
+    for prop in properties:
         file_path = os.path.join(read_dir, prop[0])
         # Check if the file exists
         if os.path.isfile(file_path):
             prop_df = get_data_from_file(file_path, prop[1])
             full_df = pd.concat([full_df, prop_df], axis=1)
-        else: 
-            print ('Warning, the file {} does not exist in the given path'.
-                   format(prop[0]))
+        else:
+            print('Warning, the file {} does not exist in the given path'.
+                  format(prop[0]))
 
     # Convert the num column to integer
     full_df[['n']] = full_df[['n']].astype(np.int64)
@@ -160,7 +181,7 @@ def read_hydrus_data(folder='Current', save_to_csv=True):
     full_df.drop(0, inplace=True)
     # Saving the resultant dataframe to disk.
     if save_to_csv:
-        full_df.to_csv(os.path.join(read_dir, 'nesr_data2.csv'))        
+        full_df.to_csv(os.path.join(read_dir, 'nesr_data2.csv'))
     return full_df
 
 
@@ -171,8 +192,8 @@ def read_hydrus_data(folder='Current', save_to_csv=True):
 
 # define source and destination folders
 
-#@# source = 'C:/Users/DrNesr/Dropbox/@CurrentWork/@Work/NewHydrus/Current'
-#@# output = 'C:/Users/DrNesr/Dropbox/@CurrentWork/@Work/NewHydrus/CSVs'
+# @# source = 'C:/Users/DrNesr/Dropbox/@CurrentWork/@Work/NewHydrus/Current'
+# @# output = 'C:/Users/DrNesr/Dropbox/@CurrentWork/@Work/NewHydrus/CSVs'
 # source, output
 
 
@@ -180,33 +201,33 @@ def read_hydrus_data(folder='Current', save_to_csv=True):
 
 
 def copy_required_files_and_folders(source, destination):
-    success, fail =0, 0
+    success, fail = 0, 0
     if not os.path.isdir(destination):
         try:
             os.mkdir(destination)
         except:
-            print ("Destination directory is not found and cannot be created")
+            print("Destination directory is not found and cannot be created")
             return None
     items = glob.glob(source + '/*')
-    n_folders = list(filter(lambda x: os.path.isdir(x) , items))
+    n_folders = list(filter(lambda x: os.path.isdir(x), items))
     for n_folder in n_folders:
         msg0 = '\nFor the directory {}'.format(n_folder.split('/')[-1])
         n_path = os.path.join(destination, n_folder.split('\\')[-1])
         items2 = glob.glob(n_folder + '/*')
-        n_files2 =list(filter(lambda x: not os.path.isdir(x), items2))
-        n_files3 = list(filter(lambda x: x[-4:].lower()==".txt", n_files2))
+        n_files2 = list(filter(lambda x: not os.path.isdir(x), items2))
+        n_files3 = list(filter(lambda x: x[-4:].lower() == ".txt", n_files2))
         n_files3_names = list(map(lambda x: x.
                                   split('\\')[-1].lower(), n_files3))
-        count_files=len(n_files3_names)
-#         print(n_files3_names)
-        if count_files==0:
-            out_msg= '\tNo (*.TXT) files found!'
+        count_files = len(n_files3_names)
+        #         print(n_files3_names)
+        if count_files == 0:
+            out_msg = '\tNo (*.TXT) files found!'
         elif count_files < 3:
-            out_msg= '\tOnly the files {} exist.'.            format(n_files3_names)
+            out_msg = '\tOnly the files {} exist.'.format(n_files3_names)
         else:
-            out_msg= '\tAll the files copied successfuly.'
-        
-        if count_files >=2 and 'MESHTRIA.TXT'.                            lower() in n_files3_names:
+            out_msg = '\tAll the files copied successfuly.'
+
+        if count_files >= 2 and 'MESHTRIA.TXT'.lower() in n_files3_names:
             # create the folder only if the important files exist
             if not os.path.exists(n_path):
                 os.mkdir(n_path)
@@ -214,18 +235,19 @@ def copy_required_files_and_folders(source, destination):
             for file_from in n_files3:
                 file_to = file_from.replace(source, destination)
                 shutil.copyfile(file_from, file_to)
-#                 print ('\t', file_from.split('\\')[-1], ' copied.')
-        
-        if count_files<3:
+        #                 print ('\t', file_from.split('\\')[-1], ' copied.')
+
+        if count_files < 3:
             print(msg0)
-            print (out_msg)
-            fail +=1
+            print(out_msg)
+            fail += 1
         else:
-            success +=1
-    print ('\nOut of {} scanned folders, we found:'.format(fail+success))
-    print ('\t{} folders processed successfully, and'.format(success))        
-    print ('\t{} folders contain one or more errors'.format(fail))
+            success += 1
+    print('\nOut of {} scanned folders, we found:'.format(fail + success))
+    print('\t{} folders processed successfully, and'.format(success))
+    print('\t{} folders contain one or more errors'.format(fail))
     pass
+
 
 # src='C:\zTest\Current'
 # dst= source #'C:\zTest\Current2'
@@ -235,21 +257,21 @@ def copy_required_files_and_folders(source, destination):
 # In[28]:
 
 
-def check_folders_suitability(parent_folder, check_for=['TH.TXT', 
-                                                        'H.TXT', 
+def check_folders_suitability(parent_folder, check_for=['TH.TXT',
+                                                        'H.TXT',
                                                         'MESHTRIA.TXT']):
     all_folders_are_ok = True
-    num_dirs=0
+    num_dirs = 0
     for _, dirs, _ in os.walk(parent_folder):
         for folder in dirs:
             if 'Genex' not in dirs:
-                missing=[]
-                num_dirs+=1
-                files = os.listdir(os.path.join(parent_folder,folder))
+                missing = []
+                num_dirs += 1
+                files = os.listdir(os.path.join(parent_folder, folder))
                 for file in check_for:
                     if file not in files:
                         missing.append(file)
-                        all_folders_are_ok=False
+                        all_folders_are_ok = False
                 if len(missing) == 1:
                     print('The file {} is missing from the folder {}'.
                           format(missing[0], folder))
@@ -258,23 +280,25 @@ def check_folders_suitability(parent_folder, check_for=['TH.TXT',
                           format(missing, folder))
                 else:
                     pass
-                        
+
                 continue
     msg = "Checked {} subfolders, and all of them contain the required files."
     if all_folders_are_ok:
-        if num_dirs==0:
+        if num_dirs == 0:
             return "No subfolders found in the given directory!"
         return msg.format(num_dirs)
     else:
         return msg.replace('all', 'some').format(num_dirs)
+
+
 # check_folders_suitability(source)
 
 
 # In[7]:
 
 
-def get_data_from_file(filename, num_cells, caption = 'Theta'):
-        '''
+def get_data_from_file(filename, num_cells, caption='Theta'):
+    '''
         Function to combine all values of a property to a single dataframe 
         inputs:
         filename, the name of the file {{with full path}}
@@ -282,37 +306,37 @@ def get_data_from_file(filename, num_cells, caption = 'Theta'):
         caption, the leading caption of the columns (we will add the portion '_T= xxx')
         where xxx is the timestep
         '''
-        # compute number of lines for each timestep
-        num_lines = int(math.ceil(num_cells /10.))
-        time_steps_remaining = True  # Flag to see if the loop should continue or not.
-        times_df = pd.DataFrame([])  # Empty dataframe
-        time_loc_start = 2  # The starting cell of the timestep
-        while time_steps_remaining:
-            line_t = linecache.getline(filename, time_loc_start).split()
-            # Check if it is the start of the timestep, otherwise exit
-            if line_t[0] == 'Time':
-                t = int(line_t[2])
-                # Finding the last line of the timestep
-                tim_loc_end = num_lines + time_loc_start + 2
-                # The starting time is always 0 because steps starts in 1 in HYDRUS
-                time_data = [0]  
-                # Create the timestep as one long list
-                for i in range(time_loc_start + 2, tim_loc_end):
-                    time_data.extend(linecache.getline(filename, i).split())
-                # Convert the list to DataFrame
-                dft=pd.DataFrame(np.array(time_data,float),
-                                 columns=['{}_T={}'.format(caption,t)])
-                if len(times_df) == 0:  # If it is the first timestep
-                    times_df = dft
-                else:  # Otherwise (for all other timesteps)
-                    times_df = pd.concat([times_df, dft], axis=1)
-                # Change the start to the probable next timestem (if exist)
-                time_loc_start = tim_loc_end + 1
-                time_steps_remaining = True if len(linecache.
-                                                   getline(filename, 
-                                                           time_loc_start)) > 0 else False
-                # End IF
-        return times_df
+    # compute number of lines for each timestep
+    num_lines = int(math.ceil(num_cells / 10.))
+    time_steps_remaining = True  # Flag to see if the loop should continue or not.
+    times_df = pd.DataFrame([])  # Empty dataframe
+    time_loc_start = 2  # The starting cell of the timestep
+    while time_steps_remaining:
+        line_t = linecache.getline(filename, time_loc_start).split()
+        # Check if it is the start of the timestep, otherwise exit
+        if line_t[0] == 'Time':
+            t = int(line_t[2])
+            # Finding the last line of the timestep
+            tim_loc_end = num_lines + time_loc_start + 2
+            # The starting time is always 0 because steps starts in 1 in HYDRUS
+            time_data = [0]
+            # Create the timestep as one long list
+            for i in range(time_loc_start + 2, tim_loc_end):
+                time_data.extend(linecache.getline(filename, i).split())
+            # Convert the list to DataFrame
+            dft = pd.DataFrame(np.array(time_data, float),
+                               columns=['{}_T{}'.format(caption, t)])
+            if len(times_df) == 0:  # If it is the first timestep
+                times_df = dft
+            else:  # Otherwise (for all other timesteps)
+                times_df = pd.concat([times_df, dft], axis=1)
+            # Change the start to the probable next timestem (if exist)
+            time_loc_start = tim_loc_end + 1
+            time_steps_remaining = True if len(linecache.
+                                               getline(filename,
+                                                       time_loc_start)) > 0 else False
+            # End IF
+    return times_df
 
 
 # In[8]:
@@ -324,7 +348,7 @@ def export_hydrus_data(source, subfolders, output):
         mesh_file = os.path.join(source, subfolder, 'MESHTRIA.TXT')
         num_2d = linecache.getline(mesh_file, 1).split()
         num_3d = linecache.getline(mesh_file, 6).split()
-        if len(num_2d) == 5: # a 2D simulation
+        if len(num_2d) == 5:  # a 2D simulation
             # reading number of points
             num_cells = int(num_2d[1])
             # Define dataframe titles
@@ -333,7 +357,7 @@ def export_hydrus_data(source, subfolders, output):
             full_data = [np.array([0, 0, 0])]
             # define the starting line to read the data
             start_line = 2
-        elif len(num_3d) ==2: # a 3D simulation
+        elif len(num_3d) == 2:  # a 3D simulation
             # reading number of points
             num_cells = int(num_3d[0])
             # Define dataframe titles
@@ -344,56 +368,56 @@ def export_hydrus_data(source, subfolders, output):
             start_line = 8
         else:
             # Not defined
-            print ('Error reading number of cells')
+            print('Error reading number of cells')
             num_cells = 0
-        print (subfolder, end="... ")#, num_2d, num_3d, num_cells,type(num_cells))
+        print(subfolder, end="... ")  # , num_2d, num_3d, num_cells,type(num_cells))
 
         # Set a loop to geather all coordinates from MESHTRIA.TXT file
         for i in range(start_line, num_cells + start_line):
-            full_data.append(np.array(linecache.getline(mesh_file, i).split(),float)) 
-        # print (full_data[:3])
+            full_data.append(np.array(linecache.getline(mesh_file, i).split(), float))
+            # print (full_data[:3])
         # Convert the list to numpy array then to a dataframe
         coordinates_df = pd.DataFrame(np.array(full_data), columns=titles)
         # Print head and tail of the dataframe to ensure correctness
         # print(pd.concat([coordinates_df.head(),coordinates_df.tail()]))
 
         # Reading TH and H files
-        
+
         # 1st: define the path of each
         theta_file = os.path.join(source, subfolder, 'TH.TXT')
         head_file = os.path.join(source, subfolder, 'H.TXT')
-        
+
         # 2nd ensure the file exists
         theta_ok, head_ok = False, False
         if os.path.isfile(theta_file):
-            th_df = get_data_from_file(theta_file, num_cells, caption = 'Th')
+            th_df = get_data_from_file(theta_file, num_cells, caption='Th')
             theta_ok = True
-        else: 
-            print ('Warning, the file "TH.TXT" does not exist in the folder: {}'.
-                   format(subfolder))
-            
+        else:
+            print('Warning, the file "TH.TXT" does not exist in the folder: {}'.
+                  format(subfolder))
+
         if os.path.isfile(head_file):
-            hd_df = get_data_from_file(head_file, num_cells, caption = 'Hd')
+            hd_df = get_data_from_file(head_file, num_cells, caption='Hd')
             head_ok = True
-        else: 
-            print ('Warning, the file "H.TXT" does not exist in the folder: {}'.
-                   format(subfolder))
-    
+        else:
+            print('Warning, the file "H.TXT" does not exist in the folder: {}'.
+                  format(subfolder))
+
         # Set the basic dataframe to the coordinates dataframe, to append to it.
-        used_dataframes=[coordinates_df]
+        used_dataframes = [coordinates_df]
         # add the existing dataframes only
         if theta_ok: used_dataframes.append(th_df)
         if head_ok: used_dataframes.append(hd_df)
         full_df = pd.concat(used_dataframes, axis=1)
-        
+
         # Convert the num column to integer
         full_df[['n']] = full_df[['n']].astype(np.int64)
-        
+
         # dropping the first row (the zeros row) as it is not necessary
         full_df.drop(0, inplace=True)
-        
-    #     print(pd.concat([full_df.head(4),full_df.tail(3)]))
-        
+
+        #     print(pd.concat([full_df.head(4),full_df.tail(3)]))
+
         # Exporting to CSV
         full_df.to_csv(os.path.join(output, '{}.CSV'.format(subfolders[subfolder])))
         print('saved to {}.CSV'.format(subfolders[subfolder]))
@@ -404,7 +428,7 @@ def export_hydrus_data(source, subfolders, output):
 
 # Testing the above functions on all the folders in the selected source path
 def retrieve_all_csv_files(source_folder, get='all', retrieve_folders_only=False,
-                          get_only_new=False, output_folder=None):
+                           get_only_new=False, output_folder=None):
     '''
     get= can be 'all', '2d', '3d', or any part of file name
     if retrieve_folders_only=True, the function will retturn a list of the folder
@@ -413,7 +437,7 @@ def retrieve_all_csv_files(source_folder, get='all', retrieve_folders_only=False
         if not None, then it will calculate only the files that do not exist.
     get can be a list, if so.. all string elements of the list should be in the folder name.
     '''
-    subfolders ={}
+    subfolders = {}
     # print('===============Creating Folders list ===============')
     for subdir, dirs, files in os.walk(source_folder):
         for i in dirs:
@@ -422,20 +446,20 @@ def retrieve_all_csv_files(source_folder, get='all', retrieve_folders_only=False
                     add_folder = True
                     # all text members in get should exist in the filename
                     for g in get:
-                        if not(g.lower() in i[5:].lower()):
+                        if not (g.lower() in i[5:].lower()):
                             add_folder = False
                     if add_folder:
-                        subfolders[i]=i[5:]
+                        subfolders[i] = i[5:]
                     pass
-                else:  #get is string
-                    if get =='all':
-                        subfolders[i]=i[5:]
+                else:  # get is string
+                    if get == 'all':
+                        subfolders[i] = i[5:]
                     elif get.lower() in i[5:].lower():
-                        subfolders[i]=i[5:]
+                        subfolders[i] = i[5:]
                     else:
                         continue
     # Creating exceptions list
-    
+
     if get_only_new & (output_folder is not None):
         exceptions = []
         for subdir, dirs, files in os.walk(output_folder):
@@ -444,35 +468,35 @@ def retrieve_all_csv_files(source_folder, get='all', retrieve_folders_only=False
                     add_folder = True
                     # all text members in get should exist in the filename
                     for g in get:
-                        if not(g.lower() in i[:-4].lower()):
+                        if not (g.lower() in i[:-4].lower()):
                             add_folder = False
                     if add_folder:
                         exceptions.append(i[:-4])
                     pass
-                else:  #get is string
-                    if get =='all':
+                else:  # get is string
+                    if get == 'all':
                         exceptions.append(i[:-4])
                     elif get.lower() in i[:-4].lower():
                         exceptions.append(i[:-4])
                     else:
                         continue
-        
-        temp_subfolders={}
-        if len(exceptions)>0:
+
+        temp_subfolders = {}
+        if len(exceptions) > 0:
             for k_elem in subfolders.keys():
-                exists_flag=False
+                exists_flag = False
                 for d_pop in exceptions:
                     if subfolders[k_elem] == d_pop:
-                        exists_flag=True
+                        exists_flag = True
                         break
                 if not exists_flag:
-                    temp_subfolders[k_elem]=subfolders[k_elem]
-                        
-            subfolders = temp_subfolders         
+                    temp_subfolders[k_elem] = subfolders[k_elem]
+
+            subfolders = temp_subfolders
     if retrieve_folders_only:
         return subfolders
-    print('\n'.join('In_Folder: {}, Out_File: {}.CSV'.format(sub,pub) for sub,
-                    pub in zip(subfolders, subfolders.values())))
+    print('\n'.join('In_Folder: {}, Out_File: {}.CSV'.format(sub, pub) for sub,
+                                                                           pub in zip(subfolders, subfolders.values())))
     print('====================================================')
     print('======= Converting HYDRUS files to CSV format ======')
     print('====================================================')
@@ -480,6 +504,7 @@ def retrieve_all_csv_files(source_folder, get='all', retrieve_folders_only=False
     print('====================================================')
     print('====  ALL THE FILES WERE CONVERTED SUCCESSFULLY  ===')
     print('====================================================')
+
 
 # test
 # retrieve_all_csv_files(source, get='all', retrieve_folders_only=True,
@@ -492,24 +517,26 @@ def retrieve_all_csv_files(source_folder, get='all', retrieve_folders_only=False
 
 
 def read_a_level_out(file_path, geom='2D'):
-    if geom.lower() =='2d':
+    if geom.lower() == '2d':
         start = 3
     else:
         start = 11
-    filename= os.path.join(file_path, 'A_Level.out')
-    headers=linecache.getline(filename, start).split()
-    #boundary conditions
-    bc1=linecache.getline(filename, start+3).split()
-    bc2=linecache.getline(filename, start+4).split()
-    filename= os.path.join(file_path, 'ATMOSPH.IN')
+    filename = os.path.join(file_path, 'A_Level.out')
+    headers = linecache.getline(filename, start).split()
+    # boundary conditions
+    bc1 = linecache.getline(filename, start + 3).split()
+    bc2 = linecache.getline(filename, start + 4).split()
+    filename = os.path.join(file_path, 'ATMOSPH.IN')
     headers += linecache.getline(filename, 7).split()
     bc1 += linecache.getline(filename, 8).split()
     bc2 += linecache.getline(filename, 9).split()
     bcs = np.array([bc1, bc2])
-    df= pd.DataFrame(data=bcs, columns=headers)
-    df=df.apply(pd.to_numeric, errors='ignore')
+    df = pd.DataFrame(data=bcs, columns=headers)
+    df = df.apply(pd.to_numeric, errors='ignore')
     return df
     pass
+
+
 # read_a_level_out(source, '3D').T
 
 
@@ -517,13 +544,13 @@ def read_a_level_out(file_path, geom='2D'):
 
 
 def read_balance_out(file_path):
-    filename= os.path.join(file_path, 'Balance.out')
-    headers=['Time', 'Volume', 'VolumeW', 'InFlow', 'hMean', 'WatBalT', 'WatBalR']
+    filename = os.path.join(file_path, 'Balance.out')
+    headers = ['Time', 'Volume', 'VolumeW', 'InFlow', 'hMean', 'WatBalT', 'WatBalR']
     reading = True
     start = 5
-    balance_info={}
+    balance_info = {}
     while reading:
-        start +=1
+        start += 1
         line_feed = linecache.getline(filename, start).split()
         feed_len = len(line_feed)
         if feed_len < 2:
@@ -532,21 +559,23 @@ def read_balance_out(file_path):
         if first_word == 'Time':
             # Initiate record
             time = float(line_feed[2])
-            balance_info[time]={'Volume':None, 'VolumeW':None,
-                                'InFlow':None, 'hMean':None,
-                                'WatBalT':None, 'WatBalR':None}
+            balance_info[time] = {'Volume': None, 'VolumeW': None,
+                                  'InFlow': None, 'hMean': None,
+                                  'WatBalT': None, 'WatBalR': None}
         elif first_word in headers:
-            balance_info[time][first_word]=float(line_feed[2])
+            balance_info[time][first_word] = float(line_feed[2])
 
-#         print(first_word)
-        if first_word=='Calculation':# or feed_len>115:
+        #         print(first_word)
+        if first_word == 'Calculation':  # or feed_len>115:
             simulation_time = line_feed[3]
-            reading=False
+            reading = False
     df = pd.DataFrame.from_dict(data=balance_info).T.reset_index()
     df.columns.values[0] = 'Time'
-#     df.rename(columns = {'index':'Time'})
-    return simulation_time, df#, columns=headers)
+    #     df.rename(columns = {'index':'Time'})
+    return simulation_time, df  # , columns=headers)
     pass
+
+
 # results = read_balance_out(source)
 # print ('Simulation time = {} seconds.'.format(results[0]))
 # results[1]
@@ -556,23 +585,23 @@ def read_balance_out(file_path):
 
 
 def read_selector_in(file_path, geom='2D'):
-    if geom.lower() =='2d':
-        is2d= True
+    if geom.lower() == '2d':
+        is2d = True
         start = 3
     else:
-        is2d= False
+        is2d = False
         start = 11
-    filename= os.path.join(file_path, 'SELECTOR.IN')
-    headers=['L_Unit', 'T_Unit', 'Category']
-    categ={0:'Horizontal plane XY',
-           1:'Axisymmetric Vertical Flow',
-           2:'Vertical Plane XZ',
-           3:'3D General Domain'}
-    body =[]
+    filename = os.path.join(file_path, 'SELECTOR.IN')
+    headers = ['L_Unit', 'T_Unit', 'Category']
+    categ = {0: 'Horizontal plane XY',
+             1: 'Axisymmetric Vertical Flow',
+             2: 'Vertical Plane XZ',
+             3: '3D General Domain'}
+    body = []
 
     def proper_type(x):
         try:
-            nf=float(x)
+            nf = float(x)
             ni = float(int(nf))
             # print(nf, ni, abs(nf - ni))
             if abs(nf - ni) < 0.0000000000001:
@@ -584,7 +613,7 @@ def read_selector_in(file_path, geom='2D'):
 
     def replace_text(x):
         if x in ('t', 'f'):
-            #return {'t':1, 'f':0}[x]
+            # return {'t':1, 'f':0}[x]
             return ['f', 't'].index(x)
         elif x in ('mm', 'cm', 'm'):
             return ['mm', 'cm', 'm'].index(x)
@@ -593,15 +622,15 @@ def read_selector_in(file_path, geom='2D'):
         elif x in ('s', 'min', 'h', 'd', 'y'):
             return ['s', 'min', 'h', 'd', 'y'].index(x)
         else:
-            return x#proper_type(x)
+            return x  # proper_type(x)
 
     def get_line(pos):
-        line_feed=linecache.getline(filename, pos).split()
-        return list(map(replace_text,line_feed))
+        line_feed = linecache.getline(filename, pos).split()
+        return list(map(replace_text, line_feed))
 
     def get_word(pos, loc=0):
-        word=get_line(pos)
-        if len(word)<1:
+        word = get_line(pos)
+        if len(word) < 1:
             return ''
         else:
             word = word[loc]
@@ -615,34 +644,32 @@ def read_selector_in(file_path, geom='2D'):
         p1, the line of 2D file
         p2, the line of 3D file
         '''
-        return {True: p1, False:p2}[is2d]
+        return {True: p1, False: p2}[is2d]
 
     def adjust_body(replaceable):
-        for _ in range(len(headers)-len(body)):
+        for _ in range(len(headers) - len(body)):
             body.append(replaceable)
-
-
 
     body.append(get_word(6))
     body.append(get_word(7))
-    body.append({True: int(get_word(10)), False:3}[is2d])
-    headers += get_line(get_num(11,9))[:4]
-    body += get_line(get_num(12,10))[:4]
+    body.append({True: int(get_word(10)), False: 3}[is2d])
+    headers += get_line(get_num(11, 9))[:4]
+    body += get_line(get_num(12, 10))[:4]
 
-    headers += get_line(get_num(13,11))
-    body += get_line(get_num(14,12))
-    headers += get_line(get_num(15,13))
-    body += get_line(get_num(16,14))
+    headers += get_line(get_num(13, 11))
+    body += get_line(get_num(14, 12))
+    headers += get_line(get_num(15, 13))
+    body += get_line(get_num(16, 14))
 
-    headers += get_line(get_num(20,18))
-    body += get_line(get_num(21,19))
+    headers += get_line(get_num(20, 18))
+    body += get_line(get_num(21, 19))
     adjust_body(0)
 
-    headers += get_line(get_num(22,20))
-    body += get_line(get_num(23,21))
+    headers += get_line(get_num(22, 20))
+    body += get_line(get_num(23, 21))
 
-    headers += get_line(get_num(24,22))
-    body += get_line(get_num(25,23))
+    headers += get_line(get_num(24, 22))
+    body += get_line(get_num(25, 23))
 
     headers += get_line(27)
     body += get_line(28)
@@ -650,26 +677,26 @@ def read_selector_in(file_path, geom='2D'):
     body += get_line(30)
 
     # Getting data from the DIMENSIO.IN file
-    filename= os.path.join(file_path, 'DIMENSIO.IN')
+    filename = os.path.join(file_path, 'DIMENSIO.IN')
     headers += get_line(2)
     body += get_line(3)
     adjust_body(0)
 
     # Getting data from the Run_Inf.out file
-    filename= os.path.join(file_path, 'Run_Inf.out')
+    filename = os.path.join(file_path, 'Run_Inf.out')
     headers += ['TLevel_i', 'Time_i', 'dt_i', 'Iter_i', 'ItCum_i']
     body += get_line(5)
-    i=6
+    i = 6
     while get_word(i) != 'end':
         i += 1
-#         print(i, get_word(i), end='||')
+    #         print(i, get_word(i), end='||')
     headers += ['TLevel_e', 'Time_e', 'dt_e', 'Iter_e', 'ItCum_e']
-    body += get_line(i-1)
+    body += get_line(i - 1)
 
     # Getting data from the Balance.out file
-    filename= os.path.join(file_path, 'Balance.out')
+    filename = os.path.join(file_path, 'Balance.out')
     headers = ['SimulTime_s'] + headers
-    i=10
+    i = 10
     while get_word(i) != 'Calculation':
         i += 1
     body = [get_word(i, loc=3)] + body
@@ -678,10 +705,12 @@ def read_selector_in(file_path, geom='2D'):
     body = np.array(body)
     headers = np.array(headers)
 
-    df=pd.DataFrame(data=body, index=headers).T
-    df=df.apply(pd.to_numeric, errors='ignore')
+    df = pd.DataFrame(data=body, index=headers).T
+    df = df.apply(pd.to_numeric, errors='ignore')
     return df
     pass
+
+
 # res=read_selector_in(source, '2d')
 # # res.astype(float)
 # # res.T.astype(float)
@@ -699,59 +728,59 @@ def get_one_line_df(folder_path, simulation_name="Nesr simulation", dims='2d'):
     df_basic = read_selector_in(folder_path, dims)
 
     # Get the boundary conditions parameters
-    df_bcs= read_a_level_out(folder_path, dims).T
+    df_bcs = read_a_level_out(folder_path, dims).T
     # converting it to one row
     hds0 = ['Time', 'CumQ3', 'hAtm', 'hKode3', 'A-level', 'hCritA', 'rt']
     hdsB = ['Time', 'CumQ3', 'hAtm', 'hKode3', 'A-level', 'hCritA', 'Flux_rt']
     hds = []
     vals = []
     for col in df_bcs.columns:
-        hds += list(map(lambda x: x+'BC{}'.format(col), hdsB))
+        hds += list(map(lambda x: x + 'BC{}'.format(col), hdsB))
         for idx in hds0:
-            if idx =='rt':
+            if idx == 'rt':
                 vals.append(df_bcs.loc[idx, col].iloc[0])
             else:
                 vals.append(df_bcs.loc[idx, col])
-    df_bcs= pd.DataFrame(data=vals, index=hds).T
+    df_bcs = pd.DataFrame(data=vals, index=hds).T
 
     # Get the mass balance parameters
     df_bal = read_balance_out(folder_path)[1]
-    hds0=['InFlow', 'VolumeW', 'WatBalR', 'WatBalT', 'hMean']
-    hds=[]
-    vals =[]
+    hds0 = ['InFlow', 'VolumeW', 'WatBalR', 'WatBalT', 'hMean']
+    hds = []
+    vals = []
     for col in hds0:
         for idx in df_bal.index:
-            hds.append(col+str(int(df_bal.loc[idx, 'Time'])))
+            hds.append(col + str(int(df_bal.loc[idx, 'Time'])))
             vals.append(df_bal.loc[idx, col])
-    df_bal= pd.DataFrame(data=vals, index=hds).T
+    df_bal = pd.DataFrame(data=vals, index=hds).T
 
     # concatenate the 3 dfs
     frames = [df_basic, df_bcs, df_bal]
 
-    df_result = pd.concat(frames,axis=1)
+    df_result = pd.concat(frames, axis=1)
     # df_result.columns
     # df_result.rename({'0':"Custom Name"}, axis='columns')
-    df_result = df_result.rename({0:simulation_name}, axis='index')
+    df_result = df_result.rename({0: simulation_name}, axis='index')
     return df_result.T
 
 
 # In[15]:
 
 
-#@# source2 = 'C:/Users/DrNesr/Dropbox/@CurrentWork/@Work/NewHydrus/PYTHONS/sample2d'
-#@# source3 = 'C:/Users/DrNesr/Dropbox/@CurrentWork/@Work/NewHydrus/PYTHONS/sample3d'
+# @# source2 = 'C:/Users/DrNesr/Dropbox/@CurrentWork/@Work/NewHydrus/PYTHONS/sample2d'
+# @# source3 = 'C:/Users/DrNesr/Dropbox/@CurrentWork/@Work/NewHydrus/PYTHONS/sample3d'
 
 
 # In[16]:
 
 
-#@# get_one_line_df(source3, simulation_name="3D Nesr simulation", dims='3D').T
+# @# get_one_line_df(source3, simulation_name="3D Nesr simulation", dims='3D').T
 
 
 # In[17]:
 
 
-#@# get_one_line_df(source2, simulation_name="2D Nesr simulation", dims='2D').T
+# @# get_one_line_df(source2, simulation_name="2D Nesr simulation", dims='2D').T
 
 
 # <div class="alert alert-block alert-success">
@@ -778,7 +807,7 @@ def distance3d(p1, p2=(0, 0, 0)):
 
 def get_section_grid(source_df_1, axis_of_section='y', grid_value=1.,
                      default_value=20., output_method='3D',
-                    is_axisymmetric=False):
+                     is_axisymmetric=False):
     ''' 
     if the output_method is 3D, then it will outputs a list of lists, each sublist
     is in the form [x, y, z]
@@ -797,19 +826,19 @@ def get_section_grid(source_df_1, axis_of_section='y', grid_value=1.,
     
     '''
     source_df = source_df_1
-#     if is_axisymmetric:
-#         # if the simulation is Axisymmetric 3D, then take only the
-#         # positive quater to compare with the 2D sections
-#         source_df=source_df_1[(source_df_1.x>=0)&(source_df_1.y>=0)]
-#     else:
-#         source_df=source_df_1
+    #     if is_axisymmetric:
+    #         # if the simulation is Axisymmetric 3D, then take only the
+    #         # positive quater to compare with the 2D sections
+    #         source_df=source_df_1[(source_df_1.x>=0)&(source_df_1.y>=0)]
+    #     else:
+    #         source_df=source_df_1
 
     # find boundaries of x, y, and z (min then max)
-    src_axis = [axs for axs in ['x', 'y','z'] if axs in source_df.columns]
+    src_axis = [axs for axs in ['x', 'y', 'z'] if axs in source_df.columns]
     n_axis = len(src_axis)
-    inf = source_df[src_axis].describe().iloc[[3,7]]
+    inf = source_df[src_axis].describe().iloc[[3, 7]]
     inf2 = list(inf.values.T)
-    mn, mx, iv, lv=[0]*n_axis,[0]*n_axis,[0]*n_axis,[0]*n_axis
+    mn, mx, iv, lv = [0] * n_axis, [0] * n_axis, [0] * n_axis, [0] * n_axis
     grid = grid_value  # cm
     for i in range(n_axis):
         # minimum and maximum
@@ -817,13 +846,12 @@ def get_section_grid(source_df_1, axis_of_section='y', grid_value=1.,
         # number of segments
         iv[i] = int(max(abs(mn[i]), abs(mx[i])) // grid) + 1
         # grid of coordinates
-        lv[i] = np.linspace(mn[i],mx[i],iv[i])
+        lv[i] = np.linspace(mn[i], mx[i], iv[i])
         pass
 
-
-     # Now specify the used axes perpendicular to the section
-     # I want to define the variable outside the if condition
-    used_axes = (0, 2) # if the default axis, y, is used
+    # Now specify the used axes perpendicular to the section
+    # I want to define the variable outside the if condition
+    used_axes = (0, 2)  # if the default axis, y, is used
     if axis_of_section.lower() == 'x':
         used_axes = (1, 2)
     elif axis_of_section.lower() == 'z':
@@ -831,8 +859,8 @@ def get_section_grid(source_df_1, axis_of_section='y', grid_value=1.,
     else:
         pass  # it is 'y'
     cros_section_grid = []
-#     print(output_method)
-    if output_method !='3D': # =='2D' for example
+    #     print(output_method)
+    if output_method != '3D':  # =='2D' for example
         used_axes = (0, 1)
         for outer in lv[used_axes[0]]:
             for inner in lv[used_axes[1]]:
@@ -851,7 +879,7 @@ def get_section_grid(source_df_1, axis_of_section='y', grid_value=1.,
                 cros_section_grid.append((x, y, z))
                 pass
             pass
-#     return mn, mx, iv, list(lv[0])
+    #     return mn, mx, iv, list(lv[0])
     return cros_section_grid, (lv[used_axes[0]], lv[used_axes[1]])
 
 
@@ -860,7 +888,7 @@ def get_section_grid(source_df_1, axis_of_section='y', grid_value=1.,
 # In[12]:
 
 
-def get_section_dataframes(source_df, axis_of_section='y', cross_at=20., 
+def get_section_dataframes(source_df, axis_of_section='y', cross_at=20.,
                            tolerance=15., output='before & after'):
     '''
     reads a dataframe, and slices it on x, y, or z axis at a specic location 
@@ -881,30 +909,30 @@ def get_section_dataframes(source_df, axis_of_section='y', cross_at=20.,
     # let us try to get points around the section Y=20
     # it is a section at XZ direction, so we have all values of X and Z
     # but only values of Y=20 plus or minus a tolerance (say 10 cm)
-    if axis_of_section.lower() =='x':
-        sec_at = source_df.x # the axis of the section
-    elif axis_of_section.lower() =='y':
-        sec_at = source_df.y # the axis of the section
+    if axis_of_section.lower() == 'x':
+        sec_at = source_df.x  # the axis of the section
+    elif axis_of_section.lower() == 'y':
+        sec_at = source_df.y  # the axis of the section
     else:  # axis_of_section ='z'
-        sec_at = source_df.z # the axis of the section
+        sec_at = source_df.z  # the axis of the section
         pass
-    
-    sec_val = cross_at # the value at which the section occur
-    sec_tol = tolerance # the tolerance of the section
+
+    sec_val = cross_at  # the value at which the section occur
+    sec_tol = tolerance  # the tolerance of the section
     # Find minimum value of the section axis
     sec_min = sec_val - sec_tol
     sec_max = sec_val + sec_tol
     # (to overcome the negative values problem)
-    sec_min, sec_max = min(sec_min, sec_max), max(sec_min, sec_max)  
+    sec_min, sec_max = min(sec_min, sec_max), max(sec_min, sec_max)
     # theta[(theta.y>=10) & (theta.y<=30)].shape
     if output == 'before & after':
         # Then we find two dataFrames, one after the point, and one before it
-        df_after = source_df[(sec_at>=sec_val) & (sec_at<=sec_max)]  #.shape
-        df_before = source_df[(sec_at>=sec_min) & (sec_at<=sec_val)]  #.shape
-    #     return df_before.shape, df_after.shape
+        df_after = source_df[(sec_at >= sec_val) & (sec_at <= sec_max)]  # .shape
+        df_before = source_df[(sec_at >= sec_min) & (sec_at <= sec_val)]  # .shape
+        #     return df_before.shape, df_after.shape
         return df_before, df_after
-    else: # outputs one dataframe
-        df_full = source_df[(sec_at>=sec_min) & (sec_at<=sec_max)]  #.shape
+    else:  # outputs one dataframe
+        df_full = source_df[(sec_at >= sec_min) & (sec_at <= sec_max)]  # .shape
         return df_full
 
 
@@ -917,7 +945,7 @@ def get_grid_values(data_frame, variable=0, time_step=180, grid=0.5,
     '''
 
     # Find the variable mask
-    v_mask = {0: 'Th', 1: 'H'}[variable]  # , 2:'V'
+    v_mask = {0: 'Th', 1: 'H', 2.1:'V1', 2.2:'V2', 2.3:'V3'}[variable]  # , 2:'V'
     if testing: print(v_mask)
 
     # first get the dataframe of the neighbors of the required cross-section
@@ -932,10 +960,10 @@ def get_grid_values(data_frame, variable=0, time_step=180, grid=0.5,
         src = get_section_dataframes(data_frame, axis_of_section=section,
                                      cross_at=crosses, tolerance=tol, output='full')
         points = np.array(src[['x', 'y', 'z']])
-    z_values = np.array(src[['{}_T={}'.format(v_mask, time_step)]])
+    z_values = np.array(src[['{}_T{}'.format(v_mask, time_step)]])
     if testing: print('src shape:{}, points shape:{}, z_values shape::'.
                       format(src.shape, points.shape, z_values.shape))
-    if testing: print(src[['{}_T={}'.format(v_mask, time_step)]].head())
+    if testing: print(src[['{}_T{}'.format(v_mask, time_step)]].head())
     # get the grid info
     # (source_df, axis_of_section='y', grid_value=1., default_value=20., output_method='3D')
     if is2d:
@@ -962,20 +990,20 @@ def get_grid_values(data_frame, variable=0, time_step=180, grid=0.5,
 
     return X, Z, M, x_vals, z_vals
 
-def get_grid_values33(data_frame, variable=0, time_step = 180, grid = 0.5,
-                    crosses = 35., tol = 10., section ='x', 
-                    testing=False, is2d=False, is_axisymmetric=False,
-                    get_two_arrays=False):
-    '''
-    
-    '''
-    
-    #Find the variable mask
-    v_mask = {0:'Th', 1:'H'}[variable] # , 2:'V'
 
+def get_grid_values33(data_frame, variable=0, time_step=180, grid=0.5,
+                      crosses=35., tol=10., section='x',
+                      testing=False, is2d=False, is_axisymmetric=False,
+                      get_two_arrays=False):
+    '''
+    
+    '''
+
+    # Find the variable mask
+    v_mask = {0: 'Th', 1: 'H'}[variable]  # , 2:'V'
 
     def get_z_frame_outputs(src1, v_mask1, time_step1, cs1, points1):
-        z_values = np.array(src1[['{}_T={}'.format(v_mask1, time_step1)]])
+        z_values = np.array(src1[['{}_T{}'.format(v_mask1, time_step1)]])
         requests = np.array(cs1[0])
         # x_vals, z_vals are the two used axes, regardless they are XY, XZ, or YZ
         x_vals, z_vals = cs1[1][0], cs1[1][1]
@@ -983,34 +1011,34 @@ def get_grid_values33(data_frame, variable=0, time_step = 180, grid = 0.5,
         print(z_values.shape, requests.shape, points1.shape)
         M = griddata(points1, z_values, requests).reshape((X.shape[1], X.shape[0])).T
         returns = X, Z, M, x_vals, z_vals
-        if len (returns)<5:
-            print (zip(['src1', 'v_mask1', 'time_step1', 'cs1', 'points1'],
-                       [src1, v_mask1, time_step1, cs1, points1]))
+        if len(returns) < 5:
+            print(zip(['src1', 'v_mask1', 'time_step1', 'cs1', 'points1'],
+                      [src1, v_mask1, time_step1, cs1, points1]))
         return returns
 
     if not get_two_arrays:  # This is the normal case to get only one array
         if is2d:
             source_df = data_frame
             src = data_frame
-            scr_cols=[axs for axs in ['x', 'y','z'] if axs in data_frame.columns]
+            scr_cols = [axs for axs in ['x', 'y', 'z'] if axs in data_frame.columns]
             points = np.array(src[scr_cols])
             cs = get_section_grid(source_df,
                                   axis_of_section='y', grid_value=grid,
                                   default_value=0., output_method='2D')
             return get_z_frame_outputs(source_df, v_mask, time_step, cs, points)
-        else: # 3D
-            src= get_section_dataframes(data_frame, axis_of_section=section,
-                                        cross_at=crosses, tolerance=tol, output='full')
+        else:  # 3D
+            src = get_section_dataframes(data_frame, axis_of_section=section,
+                                         cross_at=crosses, tolerance=tol, output='full')
             # display(src.describe())
-            points = np.array(src[['x', 'y','z']])
+            points = np.array(src[['x', 'y', 'z']])
             # display(points.shape)
 
             if is_axisymmetric:
                 # if the simulation is Axisymmetric 3D, then take only the
                 # positive quater to compare with the 2D sections
-                source_df=data_frame[(data_frame.x>=0)&(data_frame.y>=0)]
-            else: # pXZ
-                source_df=data_frame
+                source_df = data_frame[(data_frame.x >= 0) & (data_frame.y >= 0)]
+            else:  # pXZ
+                source_df = data_frame
                 pass
 
             # display(source_df.describe())
@@ -1020,7 +1048,7 @@ def get_grid_values33(data_frame, variable=0, time_step = 180, grid = 0.5,
                                   output_method='3D',
                                   is_axisymmetric=is_axisymmetric)
 
-            #display(cs)
+            # display(cs)
 
             returns = get_z_frame_outputs(source_df, v_mask, time_step, cs, points)
             return returns
@@ -1029,97 +1057,97 @@ def get_grid_values33(data_frame, variable=0, time_step = 180, grid = 0.5,
         if is2d:
             if is_axisymmetric:
                 print('2d_axi')
-                source_df=data_frame
-                scr_cols=[axs for axs in ['x', 'y','z'] if axs in source_df.columns]
+                source_df = data_frame
+                scr_cols = [axs for axs in ['x', 'y', 'z'] if axs in source_df.columns]
                 points = np.array(source_df[scr_cols])
                 cs = get_section_grid(source_df,
-                                  axis_of_section='y', grid_value=grid,
-                                  default_value=0., output_method='2D')
+                                      axis_of_section='y', grid_value=grid,
+                                      default_value=0., output_method='2D')
 
                 return get_z_frame_outputs(source_df, v_mask, time_step, cs, points)
-            else: # pXZ
+            else:  # pXZ
                 # two dataframes
                 print('2d_pXZ')
-                source_full =data_frame
+                source_full = data_frame
                 # get the middle point of the X coordinate to slice the df to half.
-                cord_inf = df[['x','z']].describe().iloc[[3,7]].values.T
-                x_avg = (cord_inf[0][1]-cord_inf[0][0])/2.
-                source_half =data_frame.copy()
-                source_half['x']=source_half['x']-x_avg
+                cord_inf = df[['x', 'z']].describe().iloc[[3, 7]].values.T
+                x_avg = (cord_inf[0][1] - cord_inf[0][0]) / 2.
+                source_half = data_frame.copy()
+                source_half['x'] = source_half['x'] - x_avg
                 source_half = source_half[source_half.x >= 0]
-                scr_cols=[axs for axs in ['x', 'y','z'] if axs in source_df.columns]
+                scr_cols = [axs for axs in ['x', 'y', 'z'] if axs in source_df.columns]
                 points_f = np.array(source_full[scr_cols])
                 points_h = np.array(source_half[scr_cols])
                 cs_f = get_section_grid(source_full,
-                                  axis_of_section='y', grid_value=grid,
-                                  default_value=0., output_method='2D')
+                                        axis_of_section='y', grid_value=grid,
+                                        default_value=0., output_method='2D')
                 cs_h = get_section_grid(source_half,
-                                  axis_of_section='y', grid_value=grid,
-                                  default_value=0., output_method='2D')
+                                        axis_of_section='y', grid_value=grid,
+                                        default_value=0., output_method='2D')
                 return (get_z_frame_outputs(source_full, v_mask, time_step, cs_f, points_f),
-                       get_z_frame_outputs(source_half, v_mask, time_step, cs_h, points_h))
-        else: # 3D
+                        get_z_frame_outputs(source_half, v_mask, time_step, cs_h, points_h))
+        else:  # 3D
             if is_axisymmetric:
                 print('3d_axi')
                 # if the simulation is Axisymmetric 3D, then take only the
                 # positive quater to compare with the 2D sections
-                source_df=data_frame[(data_frame.x>=0)&(data_frame.y>=0)]
-                src= get_section_dataframes(source_df, axis_of_section=section,
-                                        cross_at=crosses, tolerance=tol, output='full')
-                points = np.array(src[['x', 'y','z']])
+                source_df = data_frame[(data_frame.x >= 0) & (data_frame.y >= 0)]
+                src = get_section_dataframes(source_df, axis_of_section=section,
+                                             cross_at=crosses, tolerance=tol, output='full')
+                points = np.array(src[['x', 'y', 'z']])
                 cs = get_section_grid(source_df, axis_of_section=section,
                                       grid_value=grid, default_value=crosses,
                                       output_method='3D',
                                       is_axisymmetric=is_axisymmetric)
-#                 cs = get_section_grid(src, axis_of_section=section,
-#                                       grid_value=grid, default_value=crosses,
-#                                       output_method='3D',
-#                                       is_axisymmetric=is_axisymmetric)
+                #                 cs = get_section_grid(src, axis_of_section=section,
+                #                                       grid_value=grid, default_value=crosses,
+                #                                       output_method='3D',
+                #                                       is_axisymmetric=is_axisymmetric)
                 returns = get_z_frame_outputs(source_df, v_mask, time_step, cs, points)
-#                 returns = get_z_frame_outputs(src, v_mask, time_step, cs, points)
+                #                 returns = get_z_frame_outputs(src, v_mask, time_step, cs, points)
                 return returns
-            else: # pXZ
+            else:  # pXZ
                 # two dataframes
                 print('3d_pXZ')
-                source_full =data_frame
+                source_full = data_frame
                 # get the middle point of the X coordinate to slice the df to half.
-                cord_inf = source_full[['x','z']].describe().iloc[[3,7]].values.T
-                x_avg = (cord_inf[0][1]-cord_inf[0][0])/2.
+                cord_inf = source_full[['x', 'z']].describe().iloc[[3, 7]].values.T
+                x_avg = (cord_inf[0][1] - cord_inf[0][0]) / 2.
                 source_half = data_frame.copy()
                 source_half['x'] = source_half['x'] - x_avg
-                source_half = source_half [source_half.x >= 0]
-                scr_cols = ['x', 'y','z']  # they are 3D
+                source_half = source_half[source_half.x >= 0]
+                scr_cols = ['x', 'y', 'z']  # they are 3D
                 src_f = get_section_dataframes(source_full, axis_of_section=section,
-                                        cross_at=crosses, tolerance=tol, output='full')
+                                               cross_at=crosses, tolerance=tol, output='full')
                 src_h = get_section_dataframes(source_half, axis_of_section=section,
-                                        cross_at=crosses, tolerance=tol, output='full')
+                                               cross_at=crosses, tolerance=tol, output='full')
                 points_f = np.array(src_f[scr_cols])
                 points_h = np.array(src_h[scr_cols])
                 cs_f = get_section_grid(source_full,
-                                  axis_of_section=section,
-                                  grid_value=grid, default_value=crosses,
-                                  output_method='3D',
-                                  is_axisymmetric=is_axisymmetric)
+                                        axis_of_section=section,
+                                        grid_value=grid, default_value=crosses,
+                                        output_method='3D',
+                                        is_axisymmetric=is_axisymmetric)
                 cs_h = get_section_grid(source_half,
-                                  axis_of_section=section,
-                                  grid_value=grid, default_value=crosses,
-                                  output_method='3D',
-                                  is_axisymmetric=is_axisymmetric)
-#                 cs_f = get_section_grid(src_f,
-#                                   axis_of_section=section,
-#                                   grid_value=grid, default_value=crosses,
-#                                   output_method='3D',
-#                                   is_axisymmetric=is_axisymmetric)
-#                 cs_h = get_section_grid(src_h,
-#                                   axis_of_section=section,
-#                                   grid_value=grid, default_value=crosses,
-#                                   output_method='3D',
-#                                   is_axisymmetric=is_axisymmetric)
+                                        axis_of_section=section,
+                                        grid_value=grid, default_value=crosses,
+                                        output_method='3D',
+                                        is_axisymmetric=is_axisymmetric)
+                #                 cs_f = get_section_grid(src_f,
+                #                                   axis_of_section=section,
+                #                                   grid_value=grid, default_value=crosses,
+                #                                   output_method='3D',
+                #                                   is_axisymmetric=is_axisymmetric)
+                #                 cs_h = get_section_grid(src_h,
+                #                                   axis_of_section=section,
+                #                                   grid_value=grid, default_value=crosses,
+                #                                   output_method='3D',
+                #                                   is_axisymmetric=is_axisymmetric)
 
                 return (get_z_frame_outputs(source_full, v_mask, time_step, cs_f, points_f),
-                       get_z_frame_outputs(source_half, v_mask, time_step, cs_h, points_h))
-#                 return (get_z_frame_outputs(src_f, v_mask, time_step, cs_f, points_f),
-#                        get_z_frame_outputs(src_h, v_mask, time_step, cs_h, points_h))
+                        get_z_frame_outputs(source_half, v_mask, time_step, cs_h, points_h))
+    #                 return (get_z_frame_outputs(src_f, v_mask, time_step, cs_f, points_f),
+    #                        get_z_frame_outputs(src_h, v_mask, time_step, cs_h, points_h))
 
     M = griddata(points, z_values, requests).reshape((X.shape[1], X.shape[0])).T
 
@@ -1134,8 +1162,8 @@ def get_available_timesteps(data_frame):
     
     '''
     cols = list(data_frame.head())
-    mems = list(filter(lambda x: x.find('_T')>0, cols))
-    return sorted(list(set(map(lambda x: int(float(x.split('=')[1])),mems))))
+    mems = list(filter(lambda x: x.find('_T') > 0, cols))
+    return sorted(list(set(map(lambda x: int(float(x.split('=')[1])), mems))))
 
 
 # In[15]:
@@ -1150,7 +1178,7 @@ def get_full_dimensions(data_frame):
             #     _t = _t.min(), _t.max()
             # except:
             _t = np.nanmin(_t), np.nanmax(_t)
-            xyz[dim]=_t
+            xyz[dim] = _t
     #     mems = list(filter(lambda x: x.find('h_T')>0, cols))
     return xyz
 
@@ -1162,17 +1190,18 @@ def rnd(number, significant_digits=8):
     '''
     
     '''
-    return round(number*10**significant_digits)/10.**significant_digits
+    return round(number * 10 ** significant_digits) / 10. ** significant_digits
+
 
 def round_to_significance(number, significance, direction='up'):
     '''
     
     '''
     if direction == 'up':
-        num = math.ceil(number/significance) * significance
-    else: 
-        num = math.floor(number/significance) * significance
-    return rnd (num, 4)
+        num = math.ceil(number / significance) * significance
+    else:
+        num = math.floor(number / significance) * significance
+    return rnd(num, 4)
 
 
 # In[17]:
@@ -1188,19 +1217,19 @@ def smooth_series(series, odd_envelop=51, plynomial_degree=3):
     at the begining of the code.
     '''
     # correcting the inputs
-    if odd_envelop % 2 !=1:
-        odd_envelop +=1
-    if odd_envelop <3:
+    if odd_envelop % 2 != 1:
+        odd_envelop += 1
+    if odd_envelop < 3:
         odd_envelop = 3
-    if plynomial_degree<2:
-        plynomial_degree =3
+    if plynomial_degree < 2:
+        plynomial_degree = 3
     odd_envelop = int(odd_envelop)
-    plynomial_degree =int(plynomial_degree)
-    
-#     if isinstance(series, pd.Series):
-#     if isinstance(series, np.ndarray):
+    plynomial_degree = int(plynomial_degree)
+
+    #     if isinstance(series, pd.Series):
+    #     if isinstance(series, np.ndarray):
     if not isinstance(series, pd.Series):
-        sss= savgol_filter(series, odd_envelop, plynomial_degree)
+        sss = savgol_filter(series, odd_envelop, plynomial_degree)
         return pd.Series(sss)
     else:
         return pd.Series(savgol_filter(series, odd_envelop, plynomial_degree))
@@ -1215,20 +1244,20 @@ def get_legend_range(mn, mx):
     '''
     rg = mx - mn
     vnn = '{:.2E}'.format(rg)
-    ew=vnn.split('E')
+    ew = vnn.split('E')
     ws = float(ew[0]), float(ew[1])
-    wq = int(float(ew[0])), 10**int(float(ew[1]))/10.
-    step = wq[0]*wq[1]
+    wq = int(float(ew[0])), 10 ** int(float(ew[1])) / 10.
+    step = wq[0] * wq[1]
     rn = round_to_significance(mn, step, direction='up')
     rx = round_to_significance(mx, step, direction='dn')
-#     return vnn, ew, ws, wq, rr, rnd(rr)
+    #     return vnn, ew, ws, wq, rr, rnd(rr)
     # return vnn, ws, wq, step, (mn,rn), (mx, rx), np.arange(rn+step, 
     # rx+step, step)
-    return np.arange(rn+step, rx+step, step)
+    return np.arange(rn + step, rx + step, step)
 
 
 # In[19]:
-def get_fig_shape(data_frame, 
+def get_fig_shape(data_frame,
                   selected_dim='y',
                   max_height=8,
                   extra_width=1):
@@ -1244,125 +1273,125 @@ def get_fig_shape(data_frame,
     dims = get_full_dimensions(data_frame)
     for dim, vals in dims.items():
         mn, mx = vals
-        length = mx-mn
+        length = mx - mn
         dims[dim] = length
     sels = {d: dims[d] for d in dims.keys() if d != selected_dim}
     fig_shape = np.array(list(sels.values()))  # [::-1]
-    fig_shape = np.ceil(fig_shape*max_height/fig_shape[1])
+    fig_shape = np.ceil(fig_shape * max_height / fig_shape[1])
     fig_shape[0] += extra_width
     return tuple(fig_shape)
 
-def draw_contour(X, Z, M, levels=None, 
+
+def draw_contour(X, Z, M, levels=None,
                  plot_title="ElNesr cross sectional contour map",
-                x_step=10., z_step=25., mirror_x=False, mirror_z=False,
-                return_figure_object=False, fig_size=(18, 7)):
+                 x_step=10., z_step=25., mirror_x=False, mirror_z=False,
+                 return_figure_object=False, fig_size=(18, 7)):
     '''
     
     '''
     fig = plt.figure(num=None, figsize=fig_size, dpi=80, facecolor='w', edgecolor='k');
     origin = 'lower'
-    
+
     if levels is None:
-#         print(M.min(), M.max())
+        #         print(M.min(), M.max())
         try:
-#             levels = get_legend_range(M.min(), M.max())#np.arange(0.15, 0.42, 0.03)
-            levels = get_legend_range(np.nanmin(M),np.nanmax(M))#np.arange(0.15, 0.42, 0.03)
+            #             levels = get_legend_range(M.min(), M.max())#np.arange(0.15, 0.42, 0.03)
+            levels = get_legend_range(np.nanmin(M), np.nanmax(M))  # np.arange(0.15, 0.42, 0.03)
         except:
             levels = get_legend_range(-.15, 0.15)
-        
-#     CS_lines = plt.contour (X, Z, M, levels, cmap=plt.cm.Accent_r,
-#                             linewidths=(2,), origin=origin, extend='both')
-    CS_lines = plt.contour (X, Z, M, levels, cmap=plt.cm.Accent_r,
-                            linewidths=(0.25,), origin=origin, extend='both')
-    
-    CS_fill  = plt.contourf(X, Z, M, levels, cmap=plt.cm.YlGn, 
-                            origin=origin, extend='both')
-    
+
+    #     CS_lines = plt.contour (X, Z, M, levels, cmap=plt.cm.Accent_r,
+    #                             linewidths=(2,), origin=origin, extend='both')
+    CS_lines = plt.contour(X, Z, M, levels, cmap=plt.cm.Accent_r,
+                           linewidths=(0.25,), origin=origin, extend='both')
+
+    CS_fill = plt.contourf(X, Z, M, levels, cmap=plt.cm.YlGn,
+                           origin=origin, extend='both')
+
     CS_fill.cmap.set_under('oldlace')
     CS_fill.cmap.set_over('darkslategrey')
     plt.title(plot_title)
     plt.ylabel("Depth (cm)")
     cols = plt.cm.Accent_r(CS_lines.norm(CS_lines.levels))
-    #plt.clabel(CS_lines, linewidths=4, fmt='%2.2f', fontsize='x-large', 
-    plt.clabel(CS_lines, fmt='%2.2f', fontsize='x-large', 
+    # plt.clabel(CS_lines, linewidths=4, fmt='%2.2f', fontsize='x-large',
+    plt.clabel(CS_lines, fmt='%2.2f', fontsize='x-large',
                colors=cols, inline=True, inline_spacing=10)
     plt.colorbar(CS_fill)
-#     print(Z.min(), Z.max(), X.min(), X.max())
-#     print(plt.xlim)
+
+    #     print(Z.min(), Z.max(), X.min(), X.max())
+    #     print(plt.xlim)
 
     def adjust_max_and_min(_min, _max, _step):
         nn, xx, ss = _min, _max, _step
         if xx <= 0.:
             nn, xx = xx, nn
-            if ss>0:
+            if ss > 0:
                 ss = -ss
-        return nn,xx, ss
-        
+        return nn, xx, ss
+
     def adjust_axis_labels(_min, _max, _step):
         nn, xx, ss = adjust_max_and_min(_min, _max, _step)
 
-        x_list = np.arange(nn,xx, ss)
-        if abs(x_list[-1]-xx)>3: # The last number is far enough from 
-                                 # the maximum element
+        x_list = np.arange(nn, xx, ss)
+        if abs(x_list[-1] - xx) > 3:  # The last number is far enough from
+            # the maximum element
             x_list = np.hstack([x_list, xx])
         else:  # The last number is too close to the maximum element
             x_list = np.hstack([x_list[:-1], xx])
         return x_list
 
     def adjust_mirrored_labels(_min, _max, _step):
-#         print(_min, _max, _step)
+        #         print(_min, _max, _step)
         nn, xx, ss = adjust_max_and_min(_min, _max, _step)
-#         print(nn, xx, ss)
-        x_mid=(xx-nn)/2.
-#         print(x_mid)
-        
+        #         print(nn, xx, ss)
+        x_mid = (xx - nn) / 2.
+        #         print(x_mid)
+
         if x_mid < 0:
             right_list = adjust_axis_labels(min(x_mid, xx), max(x_mid, xx), ss)
-#             print('Right list',right_list)
+            #             print('Right list',right_list)
             left_list = right_list - x_mid
-#             print('left List',left_list)
-            right_list = x_mid - right_list 
-#             print('Right list2',right_list)
-            
+            #             print('left List',left_list)
+            right_list = x_mid - right_list
+            #             print('Right list2',right_list)
+
             left_list.sort()
-#             print('left List2', left_list)
+            #             print('left List2', left_list)
 
             label_list = np.hstack([left_list[:-1], right_list])
-#             print('Label list',label_list)
-            
-            real_list =x_mid-label_list 
-#             print('Real list',real_list)
-            label_list=label_list[::-1]
-#             print('Label list3',label_list)
+            #             print('Label list',label_list)
+
+            real_list = x_mid - label_list
+            #             print('Real list',real_list)
+            label_list = label_list[::-1]
+            #             print('Label list3',label_list)
             return real_list, label_list
         elif x_mid > 0:
             right_list = adjust_axis_labels(x_mid, xx, ss)
-#             print('Right list',right_list)
+            #             print('Right list',right_list)
             left_list = 2 * x_mid - right_list
-#             print(left_list)
+            #             print(left_list)
             left_list.sort()
-#             print(left_list)
+            #             print(left_list)
             real_list = np.hstack([left_list[:-1], right_list])
-#             print(real_list)
-            label_list =real_list - x_mid
-#             print(label_list)
-            label_list =tuple(['{:3.1f}'.format(x) for x in label_list])
-#             print(label_list)
+            #             print(real_list)
+            label_list = real_list - x_mid
+            #             print(label_list)
+            label_list = tuple(['{:3.1f}'.format(x) for x in label_list])
+            #             print(label_list)
             return real_list, label_list
         else:
             real_list, label_list = None, None
             return real_list, label_list
-            
-        
-        
-#     print('mir_X draw_contour2: ', mirror_x, 'x_step: ', x_step)
+
+    #     print('mir_X draw_contour2: ', mirror_x, 'x_step: ', x_step)
     if mirror_x:
         if x_step is not None:
             # ticks, labels = adjust_mirrored_labels(X.min(),X.max(), x_step)
             ticks, labels = adjust_mirrored_labels(np.nanmin(X), np.nanmax(X), x_step)
-#             print(ticks, labels)
+            #             print(ticks, labels)
             plt.xticks(ticks, labels)
-    else: # No Mirroring
+    else:  # No Mirroring
         if x_step is not None:
             # plt.xticks(adjust_axis_labels(X.min(),X.max(), x_step))
             plt.xticks(adjust_axis_labels(np.nanmin(X), np.nanmax(X), x_step))
@@ -1372,15 +1401,15 @@ def draw_contour(X, Z, M, levels=None,
             # ticks, labels = adjust_mirrored_labels(Z.min(),Z.max(), z_step)
             ticks, labels = adjust_mirrored_labels(np.nanmin(Z), np.nanmax(Z), z_step)
             plt.yticks(ticks, labels)
-    else: # No Mirroring
+    else:  # No Mirroring
         if z_step is not None:
             # plt.yticks(adjust_axis_labels(Z.min(),Z.max(), z_step))
             plt.yticks(adjust_axis_labels(np.nanmin(Z), np.nanmax(Z), z_step))
-#     ax=plt.axes()
+    #     ax=plt.axes()
     ax = plt.gca()
     ax.grid(True, zorder=0)
-#     plt.axes().xaxis.grid(True, zorder=0)
-#     plt.axes().yaxis.grid(True, zorder=0)
+    #     plt.axes().xaxis.grid(True, zorder=0)
+    #     plt.axes().yaxis.grid(True, zorder=0)
     # plt.colorbar(CS_lines)
     if return_figure_object:
         return fig
@@ -1391,14 +1420,13 @@ def draw_contour(X, Z, M, levels=None,
 # In[20]:
 
 
-def draw_full_contour(data_frame,variable=0, time_step=180, grid= 0.5, 
-                      crosses=35., tol=10., section= 'x', levels=None,
+def draw_full_contour(data_frame, variable=0, time_step=180, grid=0.5,
+                      crosses=35., tol=10., section='x', levels=None,
                       plot_title="ElNesr cross sectional contour map",
                       return_arrays=True, x_step=None, z_step=None,
-                      mirror_x=False, mirror_z=False, is2d=False, 
+                      mirror_x=False, mirror_z=False, is2d=False,
                       output_the_contour=True, is_axisymmetric=False,
                       return_figure_object=False, fig_size=(18, 7)):
-    
     '''
     Either (1) set the return_arrays to True and use on right 
                 hand side of equal sign, 
@@ -1413,56 +1441,56 @@ def draw_full_contour(data_frame,variable=0, time_step=180, grid= 0.5,
                            tol, section, return_arrays=False)    
 
     '''
-#     print('is2d=', is2d)
+    #     print('is2d=', is2d)
     X, Z, M, x_vals, z_vals = get_grid_values(data_frame,
-                             variable,
-                             time_step, grid, crosses,
-                             tol, section, is2d=is2d,
-                             is_axisymmetric=is_axisymmetric,
-                             get_two_arrays=get_two_arrays)
+                                              variable,
+                                              time_step, grid, crosses,
+                                              tol, section, is2d=is2d,
+                                              is_axisymmetric=is_axisymmetric,
+                                              get_two_arrays=get_two_arrays)
     # print(x_vals.shape, z_vals.shape, X.shape, Z.shape, M.shape)
     if levels is None:
-        levels = get_legend_range(np.nanmin(M),np.nanmax(M))#np.arange(0.15, 0.42, 0.03)
+        levels = get_legend_range(np.nanmin(M), np.nanmax(M))  # np.arange(0.15, 0.42, 0.03)
 
-    mn, mx = np.nanmin(M),np.nanmax(M)
+    mn, mx = np.nanmin(M), np.nanmax(M)
     # print (mx,mn, mx-mn)
     if mx - mn < 0.000000001:
         print('For the requested contour map of {}'.format(plot_title), end='. ')
-        print ("The map has one value only ({}), no contour map will be drawn.".
-               format(mn))
-        can_draw_figure=False
+        print("The map has one value only ({}), no contour map will be drawn.".
+              format(mn))
+        can_draw_figure = False
     else:
-        can_draw_figure=True
+        can_draw_figure = True
 
     if not output_the_contour and not return_figure_object:
         fig = None
     else:
         if can_draw_figure:
             fig = draw_contour(X, Z, M, levels, plot_title, x_step, z_step,
-                             mirror_x, mirror_z, return_figure_object, fig_size=fig_size);
+                               mirror_x, mirror_z, return_figure_object, fig_size=fig_size);
         else:
             fig = None
 
-#     exit()
+    #     exit()
     if return_arrays:
         if output_the_contour:
             if return_figure_object:
                 return X, Z, M, levels, fig
-            else: # return_figure_object=False
+            else:  # return_figure_object=False
                 display(fig)
                 return X, Z, M, levels
-        else:  #output_the_contour=False
+        else:  # output_the_contour=False
             if return_figure_object:
                 return X, Z, M, levels, fig
-            else: # return_figure_object=False
+            else:  # return_figure_object=False
                 return X, Z, M, levels
-    else:  #return_arrays=False
+    else:  # return_arrays=False
         if output_the_contour:
             if return_figure_object:
                 return fig
-            else: # return_figure_object=False
+            else:  # return_figure_object=False
                 display(fig)
-        else:  #output_the_contour=False
+        else:  # output_the_contour=False
             if return_figure_object:
                 return fig
 
@@ -1470,25 +1498,27 @@ def draw_full_contour(data_frame,variable=0, time_step=180, grid= 0.5,
 # In[194]:
 
 
-def get_packed_arrays(data_frame,variable=0, time_step=180, grid= 0.5,
-                      crosses=35., tol=10., section= 'x', is2d=False,
+def get_packed_arrays(data_frame, variable=0, time_step=180, grid=0.5,
+                      crosses=35., tol=10., section='x', is2d=False,
                       is_axisymmetric=False, levels=None,
-                      get_two_arrays=False):  #, proceed_with_array_number=0):
+                      get_two_arrays=False):  # , proceed_with_array_number=0):
     """
     draw_full_contour2_1
     part one of the modified draw_full_contour function
     for the axi-pXZ relationships
     """
     packed_grid_values = get_grid_values(data_frame,
-                                 variable,
-                                 time_step, grid, crosses,
-                                 tol, section, is2d=is2d,
-                                 is_axisymmetric=is_axisymmetric,
-                                 get_two_arrays=get_two_arrays)
+                                         variable,
+                                         time_step, grid, crosses,
+                                         tol, section, is2d=is2d,
+                                         is_axisymmetric=is_axisymmetric,
+                                         get_two_arrays=get_two_arrays)
     X, Z, M, _, __ = packed_grid_values
     if levels is None:
-        levels = get_legend_range(np.nanmin(M),np.nanmax(M))#np.arange(0.15, 0.42, 0.03)
+        levels = get_legend_range(np.nanmin(M), np.nanmax(M))  # np.arange(0.15, 0.42, 0.03)
     return X, Z, M, levels
+
+
 # if not get_two_arrays:
 #     X, Z, M, x_vals, z_vals = get_packed_arrays(...)
 # else
@@ -1499,14 +1529,12 @@ def get_packed_arrays(data_frame,variable=0, time_step=180, grid= 0.5,
 
 
 def draw_full_contour_v2(X, Z, M, x_vals, z_vals, levels=None,
-                      plot_title="ElNesr cross sectional contour map",
-                      return_arrays=True, x_step=None, z_step=None,
-                      mirror_x=False, mirror_z=False, is2d=False,
-                      output_the_contour=True, is_axisymmetric=False,
-                      return_figure_object=False, fig_size=(18, 7),
-                      get_two_arrays=False, proceed_with_array_number=0):
-
-
+                         plot_title="ElNesr cross sectional contour map",
+                         return_arrays=True, x_step=None, z_step=None,
+                         mirror_x=False, mirror_z=False, is2d=False,
+                         output_the_contour=True, is_axisymmetric=False,
+                         return_figure_object=False, fig_size=(18, 7),
+                         get_two_arrays=False, proceed_with_array_number=0):
     '''
     Either (1) set the return_arrays to True and use on right
                 hand side of equal sign,
@@ -1526,51 +1554,51 @@ def draw_full_contour_v2(X, Z, M, x_vals, z_vals, levels=None,
             for now, the figures will be drawn using the normal (first) array only.
             We may change this in the future.
     '''
-#     print('is2d=', is2d)
+    #     print('is2d=', is2d)
 
     # print(x_vals.shape, z_vals.shape, X.shape, Z.shape, M.shape)
     if levels is None:
-        levels = get_legend_range(np.nanmin(M),np.nanmax(M))#np.arange(0.15, 0.42, 0.03)
+        levels = get_legend_range(np.nanmin(M), np.nanmax(M))  # np.arange(0.15, 0.42, 0.03)
 
-    mn, mx = np.nanmin(M),np.nanmax(M)
+    mn, mx = np.nanmin(M), np.nanmax(M)
     # print (mx,mn, mx-mn)
     if mx - mn < 0.000000001:
         print('For the requested contour map of {}'.format(plot_title), end='. ')
-        print ("The map has one value only ({}), no contour map will be drawn.".
-               format(mn))
-        can_draw_figure=False
+        print("The map has one value only ({}), no contour map will be drawn.".
+              format(mn))
+        can_draw_figure = False
     else:
-        can_draw_figure=True
+        can_draw_figure = True
 
     if not output_the_contour and not return_figure_object:
         fig = None
     else:
         if can_draw_figure:
             fig = draw_contour(X, Z, M, levels, plot_title, x_step, z_step,
-                             mirror_x, mirror_z, return_figure_object, fig_size=fig_size);
+                               mirror_x, mirror_z, return_figure_object, fig_size=fig_size);
         else:
             fig = None
 
-#     exit()
+    #     exit()
     if return_arrays:
         if output_the_contour:
             if return_figure_object:
                 return X, Z, M, levels, fig
-            else: # return_figure_object=False
+            else:  # return_figure_object=False
                 display(fig)
                 return X, Z, M, levels
-        else:  #output_the_contour=False
+        else:  # output_the_contour=False
             if return_figure_object:
                 return X, Z, M, levels, fig
-            else: # return_figure_object=False
+            else:  # return_figure_object=False
                 return X, Z, M, levels
-    else:  #return_arrays=False
+    else:  # return_arrays=False
         if output_the_contour:
             if return_figure_object:
                 return fig
-            else: # return_figure_object=False
+            else:  # return_figure_object=False
                 display(fig)
-        else:  #output_the_contour=False
+        else:  # output_the_contour=False
             if return_figure_object:
                 return fig
 
@@ -1578,15 +1606,14 @@ def draw_full_contour_v2(X, Z, M, x_vals, z_vals, levels=None,
 # In[196]:
 
 
-def draw_full_contour2(data_frame,variable=0, time_step=180, grid= 0.5,
-                      crosses=35., tol=10., section= 'x', levels=None,
-                      plot_title="ElNesr cross sectional contour map",
-                      return_arrays=True, x_step=None, z_step=None,
-                      mirror_x=False, mirror_z=False, is2d=False,
-                      output_the_contour=True, is_axisymmetric=False,
-                      return_figure_object=False, fig_size=(18, 7),
-                      get_two_arrays=False, proceed_with_array_number=0):
-
+def draw_full_contour2(data_frame, variable=0, time_step=180, grid=0.5,
+                       crosses=35., tol=10., section='x', levels=None,
+                       plot_title="ElNesr cross sectional contour map",
+                       return_arrays=True, x_step=None, z_step=None,
+                       mirror_x=False, mirror_z=False, is2d=False,
+                       output_the_contour=True, is_axisymmetric=False,
+                       return_figure_object=False, fig_size=(18, 7),
+                       get_two_arrays=False, proceed_with_array_number=0):
     '''
     Either (1) set the return_arrays to True and use on right
                 hand side of equal sign,
@@ -1606,90 +1633,87 @@ def draw_full_contour2(data_frame,variable=0, time_step=180, grid= 0.5,
             for now, the figures will be drawn using the normal (first) array only.
             We may change this in the future.
     '''
-#     print('is2d=', is2d)
+    #     print('is2d=', is2d)
     packed_grid_values = get_grid_values(data_frame,
-                                 variable,
-                                 time_step, grid, crosses,
-                                 tol, section, is2d=is2d,
-                                 is_axisymmetric=is_axisymmetric,
-                                 get_two_arrays=get_two_arrays)
+                                         variable,
+                                         time_step, grid, crosses,
+                                         tol, section, is2d=is2d,
+                                         is_axisymmetric=is_axisymmetric,
+                                         get_two_arrays=get_two_arrays)
     if not get_two_arrays:
         X, Z, M, x_vals, z_vals = packed_grid_values
     else:
         X, Z, M, x_vals, z_vals = packed_grid_values[0]
     # print(x_vals.shape, z_vals.shape, X.shape, Z.shape, M.shape)
     if levels is None:
-        levels = get_legend_range(np.nanmin(M),np.nanmax(M))#np.arange(0.15, 0.42, 0.03)
+        levels = get_legend_range(np.nanmin(M), np.nanmax(M))  # np.arange(0.15, 0.42, 0.03)
 
-    mn, mx = np.nanmin(M),np.nanmax(M)
+    mn, mx = np.nanmin(M), np.nanmax(M)
     # print (mx,mn, mx-mn)
     if mx - mn < 0.000000001:
         print('For the requested contour map of {}'.format(plot_title), end='. ')
-        print ("The map has one value only ({}), no contour map will be drawn.".
-               format(mn))
-        can_draw_figure=False
+        print("The map has one value only ({}), no contour map will be drawn.".
+              format(mn))
+        can_draw_figure = False
     else:
-        can_draw_figure=True
+        can_draw_figure = True
 
     if not output_the_contour and not return_figure_object:
         fig = None
     else:
         if can_draw_figure:
             fig = draw_contour(X, Z, M, levels, plot_title, x_step, z_step,
-                             mirror_x, mirror_z, return_figure_object);
+                               mirror_x, mirror_z, return_figure_object);
         else:
             fig = None
 
-#     exit()
+    #     exit()
     if return_arrays:
         if output_the_contour:
             if return_figure_object:
                 return X, Z, M, levels, fig
-            else: # return_figure_object=False
+            else:  # return_figure_object=False
                 display(fig)
                 # fig.show()
                 return X, Z, M, levels
-        else:  #output_the_contour=False
+        else:  # output_the_contour=False
             if return_figure_object:
                 return X, Z, M, levels, fig
-            else: # return_figure_object=False
+            else:  # return_figure_object=False
                 return X, Z, M, levels
-    else:  #return_arrays=False
+    else:  # return_arrays=False
         if output_the_contour:
             if return_figure_object:
                 return fig
-            else: # return_figure_object=False
+            else:  # return_figure_object=False
                 display(fig)
                 # fig.show()
-        else:  #output_the_contour=False
+        else:  # output_the_contour=False
             if return_figure_object:
                 return fig
-
-
-    
 
 
 # In[21]:
 
 
 def reduce_crossed_at_list(cs_list):
-        ''' read the reduce_auto_list above'''
-        a1, an = cs_list[0], cs_list[-1]
-        if len(cs_list) %2 ==1: # Odd list
-            cs2= cs_list[1:-1][1::2]
-            return np.hstack([a1, cs2, an])
-        else: # even list
-            cs2= cs_list[1:-1]
-            zl = zip (cs2[::2], cs2[1::2])
-            return np.hstack([a1, list(map(np.mean, list(zl))), an])
+    ''' read the reduce_auto_list above'''
+    a1, an = cs_list[0], cs_list[-1]
+    if len(cs_list) % 2 == 1:  # Odd list
+        cs2 = cs_list[1:-1][1::2]
+        return np.hstack([a1, cs2, an])
+    else:  # even list
+        cs2 = cs_list[1:-1]
+        zl = zip(cs2[::2], cs2[1::2])
+        return np.hstack([a1, list(map(np.mean, list(zl))), an])
 
 
 # In[22]:
 
 
-def draw_cross_sections(input_array, xs_array, zs_array, direction='z', 
+def draw_cross_sections(input_array, xs_array, zs_array, direction='z',
                         crossed_at_list=None, number_of_sections=10,
-                       measured_value='Th', reduce_auto_list=False):
+                        measured_value='Th', reduce_auto_list=False):
     '''
     inputs:
         input_array, xs_array, zs_array are two_dim_array is a 2D array, 
@@ -1712,118 +1736,118 @@ def draw_cross_sections(input_array, xs_array, zs_array, direction='z',
                    while if the provided list is even [0,,,,70]
                    it will display [0, 15, 35, 55, 70]. the default is False
     '''
-#     colors=[(1, 0, 0), (0, 1, 0), (0, 0, 1)] # R -> G -> B
-#     colors=['indigo', 'darkviolet', 'darkblue', 'blue', 'darkmagenta', 'darkcyan', 
-#             'darkgreen', 'darkolivegreen', 'olive', 'darkgoldenrod', 'firebrick', 
-#                 'red' ] # R -> G -> B
-#     colors=['darkviolet', 'darkblue', 'blue', 'magenta', 'darkcyan', 'darkgreen', 
-#             'green', 'y', 'darkorange', 'firebrick', 'red']    
-    colors=['darkviolet', 'y','blue', 'gold','darkgreen','darkcyan', 'yellow','red']
-#     random.shuffle(colors)
-#     print (colors)
+    #     colors=[(1, 0, 0), (0, 1, 0), (0, 0, 1)] # R -> G -> B
+    #     colors=['indigo', 'darkviolet', 'darkblue', 'blue', 'darkmagenta', 'darkcyan',
+    #             'darkgreen', 'darkolivegreen', 'olive', 'darkgoldenrod', 'firebrick',
+    #                 'red' ] # R -> G -> B
+    #     colors=['darkviolet', 'darkblue', 'blue', 'magenta', 'darkcyan', 'darkgreen',
+    #             'green', 'y', 'darkorange', 'firebrick', 'red']
+    colors = ['darkviolet', 'y', 'blue', 'gold', 'darkgreen', 'darkcyan', 'yellow', 'red']
+    #     random.shuffle(colors)
+    #     print (colors)
     cmap_name = 'Nesr_cmap'
-    n_bin=len(colors)*2
+    n_bin = len(colors) * 2
     cm = LSCm.from_list(cmap_name, colors, N=n_bin)
-    col_map = ['Paired', 'nipy_spectral', 'brg', 'prism', 'tab10', 
+    col_map = ['Paired', 'nipy_spectral', 'brg', 'prism', 'tab10',
                'tab20', 'tab20b'][0]
     col_map = cm
+
     def reduce_crossed_at_list(cs_list):
-            ''' read the reduce_auto_list above'''
-            a1, an = cs_list[0], cs_list[-1]
-            if len(cs_list) %2 ==1: # Odd list
-                cs2= cs_list[1:-1][1::2]
-                return np.hstack([a1, cs2, an])
-            else: # even list
-                cs2= cs_list[1:-1]
-                zl = zip (cs2[::2], cs2[1::2])
-                return np.hstack([a1, list(map(np.mean, list(zl))), an])            
-                
-    
+        ''' read the reduce_auto_list above'''
+        a1, an = cs_list[0], cs_list[-1]
+        if len(cs_list) % 2 == 1:  # Odd list
+            cs2 = cs_list[1:-1][1::2]
+            return np.hstack([a1, cs2, an])
+        else:  # even list
+            cs2 = cs_list[1:-1]
+            zl = zip(cs2[::2], cs2[1::2])
+            return np.hstack([a1, list(map(np.mean, list(zl))), an])
+
     def draw_cs_x(depth_df, cs_range, axis_label, title_part):
-#         plt.rc('text', usetex=True)
-#         plt.rc('font', family='serif')
-        
-#         cs_range = np.arange(-50, 0, 5)
-        depth_cs_df=[]
+        #         plt.rc('text', usetex=True)
+        #         plt.rc('font', family='serif')
+
+        #         cs_range = np.arange(-50, 0, 5)
+        depth_cs_df = []
         for sec in cs_range:
-            current_series= depth_df.loc[sec]
+            current_series = depth_df.loc[sec]
             name = '@{:04.1f} cm'.format(current_series.name)
-            idx =  current_series.index
+            idx = current_series.index
             smoothed = smooth_series(current_series)
             smoothed.index = idx
             smoothed.name = name
             depth_cs_df.append(smoothed)
 
-        depth_cs_df= pd.concat(depth_cs_df,axis=1)
+        depth_cs_df = pd.concat(depth_cs_df, axis=1)
         depth_cs_df.head(10)
-        xs =depth_df.columns
-        ax = depth_cs_df.plot(figsize=(9,6), grid=True, colormap=col_map, 
-                              xlim=(np.nanmin(xs), np.nanmax(xs)) )#xlim=(xs.min(), xs.max()) )
+        xs = depth_df.columns
+        ax = depth_cs_df.plot(figsize=(9, 6), grid=True, colormap=col_map,
+                              xlim=(np.nanmin(xs), np.nanmax(xs)))  # xlim=(xs.min(), xs.max()) )
         ax.set_ylabel(axis_label, fontsize=12)
         ax.set_xlabel(r'Horizontal distance in {} direction $(cm)$'.
                       format(direction), fontsize=12)
-        _ti='The change in {} accross the horizontal distance, at different depths'
-        ax.set_title(_ti.format(title_part),
-                     fontsize=16, y=1.08)
-        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10),
-          fancybox=True, shadow=True, ncol=5)
-        pass
-    
-
-    def draw_cs_z(x_df, cs_range, axis_label, title_part):
-        x_cs_df=[]
-        for sec in cs_range:
-            ts=x_df.loc[:,sec].reset_index()
-            ts.rename(columns={ts.columns[0]: "@{:04.1f} cm".
-                               format(ts.columns[1]), 
-                               ts.columns[1]: 'Value'}, inplace=True)
-            sss=ts['Value'].apply(lambda x: int(x*1000)/1000)
-            ts['Value']= smooth_series(sss)
-            ts.set_index('Value', inplace=True)
-            x_cs_df.append(ts)
-        x_cs_df= pd.concat(x_cs_df,axis=0)#, keys='df{}'.format(cs_range))
-        # ms =depth_df.values
-        zs =depth_df.index
-        ax = x_cs_df.plot(figsize=(6,8), grid=True, colormap=col_map,
-                          ylim=(np.nanmin(zs), np.nanmax(zs))) #ylim=(zs.min(), zs.max()))#, xlim=(ms.min(), ms.max()) )
-        ax.set_xlabel(axis_label, fontsize=12)
-        _ti='The change in {} accross depth, at different horizontal distances'
-        ax.set_ylabel(r'Depth under soil $(cm)$',fontsize=12)
+        _ti = 'The change in {} accross the horizontal distance, at different depths'
         ax.set_title(_ti.format(title_part),
                      fontsize=16, y=1.08)
         ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10),
                   fancybox=True, shadow=True, ncol=5)
-        pass    
-    
-    
-    # Correct inputs to be numpy arrays
+        pass
+
+    def draw_cs_z(x_df, cs_range, axis_label, title_part):
+        x_cs_df = []
+        for sec in cs_range:
+            ts = x_df.loc[:, sec].reset_index()
+            ts.rename(columns={ts.columns[0]: "@{:04.1f} cm".
+                      format(ts.columns[1]),
+                               ts.columns[1]: 'Value'}, inplace=True)
+            sss = ts['Value'].apply(lambda x: int(x * 1000) / 1000)
+            ts['Value'] = smooth_series(sss)
+            ts.set_index('Value', inplace=True)
+            x_cs_df.append(ts)
+        x_cs_df = pd.concat(x_cs_df, axis=0)  # , keys='df{}'.format(cs_range))
+        # ms =depth_df.values
+        zs = depth_df.index
+        ax = x_cs_df.plot(figsize=(6, 8), grid=True, colormap=col_map,
+                          ylim=(
+                          np.nanmin(zs), np.nanmax(zs)))  # ylim=(zs.min(), zs.max()))#, xlim=(ms.min(), ms.max()) )
+        ax.set_xlabel(axis_label, fontsize=12)
+        _ti = 'The change in {} accross depth, at different horizontal distances'
+        ax.set_ylabel(r'Depth under soil $(cm)$', fontsize=12)
+        ax.set_title(_ti.format(title_part),
+                     fontsize=16, y=1.08)
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10),
+                  fancybox=True, shadow=True, ncol=5)
+        pass
+
+        # Correct inputs to be numpy arrays
+
     inputs = [input_array, xs_array, zs_array]
     for i, lst in enumerate(inputs):
         if isinstance(lst, list):
             inputs[i] = np.ndarray(lst)
-    input_array, xs_array, zs_array = inputs 
-    
+    input_array, xs_array, zs_array = inputs
+
     # Check if the xs and zs are passed as 2Dim or 1Dim.
     # If passed as 2D, we take the axis that is corresponding to each.
     if xs_array.ndim == 2:
-        _x = xs_array[0,:]
+        _x = xs_array[0, :]
     if zs_array.ndim == 2:
-        _z = zs_array[:,0]
+        _z = zs_array[:, 0]
 
     depth_df = pd.DataFrame(input_array, index=_z, columns=_x, dtype=float)
-    
-    #Create the crossing list if none provided
+
+    # Create the crossing list if none provided
     if crossed_at_list is None:
         if direction == 'x' or direction == 'y':
             # zx, zn = _z.max(), _z.min()
-            zx, zn = np.nanmax(_z), np.nanmin(_z)#_z.min()
+            zx, zn = np.nanmax(_z), np.nanmin(_z)  # _z.min()
         elif direction == 'z':
-            zx, zn = np.nanmax(_x), np.nanmin(_x)#_x.max(), _x.min()
-        step = (zx - zn)/number_of_sections
+            zx, zn = np.nanmax(_x), np.nanmin(_x)  # _x.max(), _x.min()
+        step = (zx - zn) / number_of_sections
         cs_range = np.arange(zn, zx, step)
         if reduce_auto_list:
             cs_range = reduce_crossed_at_list(cs_range)
-    
+
     # set the axis labels
     if measured_value == 'Th':
         axis_label = r'Moisture content $(cm^{3}/cm^{3})$'
@@ -1834,54 +1858,53 @@ def draw_cross_sections(input_array, xs_array, zs_array, direction='z',
     else:
         axis_label = 'Undefined measure'
         title_part = 'undefined measure'
-        
-    
+
     function = {'x': draw_cs_x, 'y': draw_cs_x, 'z': draw_cs_z}
-    function[direction](depth_df, cs_range, axis_label, title_part)    
+    function[direction](depth_df, cs_range, axis_label, title_part)
 
 
 # In[23]:
 
 
-def integrate_volume(sX, sZ, sM, method='Simp', get_average=False, 
+def integrate_volume(sX, sZ, sM, method='Simp', get_average=False,
                      separate_negatives=False):
     """
     
     """
     if separate_negatives:
         # in this case, the sM will be divided into two arrays, 
-#         one with positives, and one for negatives
-        positives_array = np.where(sM>0,sM,0)
-        positives_results = integrate_volume(sX, sZ, positives_array, 
-                                             method=method, 
-                                             get_average=get_average, 
+        #         one with positives, and one for negatives
+        positives_array = np.where(sM > 0, sM, 0)
+        positives_results = integrate_volume(sX, sZ, positives_array,
+                                             method=method,
+                                             get_average=get_average,
                                              separate_negatives=False)
-        negatives_array = np.where(sM<=0,sM,0)
-        negatives_results = integrate_volume(sX, sZ, negatives_array, 
-                                             method=method, 
-                                             get_average=get_average, 
+        negatives_array = np.where(sM <= 0, sM, 0)
+        negatives_results = integrate_volume(sX, sZ, negatives_array,
+                                             method=method,
+                                             get_average=get_average,
                                              separate_negatives=False)
         if get_average:
-            total_results = (positives_results[0]+negatives_results[0], 
-                            positives_results[1]+negatives_results[1], 
-                            positives_results[2])
+            total_results = (positives_results[0] + negatives_results[0],
+                             positives_results[1] + negatives_results[1],
+                             positives_results[2])
         else:
-             total_results = positives_results+negatives_results
+            total_results = positives_results + negatives_results
         return positives_results, negatives_results, total_results
-    
+
     requested_method = method.lower()[:4]
     if requested_method == 'simp':
-        vol = integrate.simps(integrate.simps(sM, sX, axis=1),sZ)
+        vol = integrate.simps(integrate.simps(sM, sX, axis=1), sZ)
     elif requested_method == 'trap':
-        vol = np.trapz(np.trapz(sM, sX, axis=1),sZ)
-    else: # requested_method == 'mean':
-        vol = 0.5 * (integrate.simps(integrate.simps(sM, sX, axis=1),sZ) 
-                     + np.trapz(np.trapz(sM, sX, axis=1),sZ))
+        vol = np.trapz(np.trapz(sM, sX, axis=1), sZ)
+    else:  # requested_method == 'mean':
+        vol = 0.5 * (integrate.simps(integrate.simps(sM, sX, axis=1), sZ)
+                     + np.trapz(np.trapz(sM, sX, axis=1), sZ))
     if get_average:
         # Lx, Lz = (sX.max()-sX.min()), (sZ.max()-sZ.min())
         Lx, Lz = (np.nanmax(sX) - np.nanmin(sX)), (np.nanmax(sZ) - np.nanmin(sZ))
-        area= Lx*Lz
-        return vol, vol/area, area
+        area = Lx * Lz
+        return vol, vol / area, area
     else:
         return vol
     pass
@@ -1891,11 +1914,11 @@ def integrate_volume(sX, sZ, sM, method='Simp', get_average=False,
 
 
 def draw_difference(arr1x, arr2x, scale_from=0, custom_levels=None,
-                    x_step=10., z_step=25., mirror_x=False, mirror_z=False, 
-                    calculate_volume=False, calculate_average=False, 
+                    x_step=10., z_step=25., mirror_x=False, mirror_z=False,
+                    calculate_volume=False, calculate_average=False,
                     no_contours=False, separate_negatives=False,
                     calculate_volume_percent=False,
-                    return_calculations=True, return_figure_object=False, fig_size=(18,7),
+                    return_calculations=True, return_figure_object=False, fig_size=(18, 7),
                     passed_arrays_are_axi=(False, False)):
     """
     A function that calculates the difference between two arrays. 
@@ -1971,17 +1994,17 @@ def draw_difference(arr1x, arr2x, scale_from=0, custom_levels=None,
     """
     # First, we have to check if the arrays are of equal sizes,
     # If not, then the largest should be truncated to the smallest size.
-#     print(type(arr1x), type(arr2x))
-#     print(len(arr1x), len(arr2x))
+    #     print(type(arr1x), type(arr2x))
+    #     print(len(arr1x), len(arr2x))
     arr1, arr2 = list(arr1x), list(arr2x)
-#     print(type(arr1), type(arr2))
-#     print(len(arr1), len(arr2))
+    #     print(type(arr1), type(arr2))
+    #     print(len(arr1), len(arr2))
 
-#     for arrx in (arr1, arr2):
-#         for item in arrx:
-#             print (item.shape, end="; ")
-#         print()
-# #     return 1,2,3,4,5,"Done for now"
+    #     for arrx in (arr1, arr2):
+    #         for item in arrx:
+    #             print (item.shape, end="; ")
+    #         print()
+    # #     return 1,2,3,4,5,"Done for now"
 
     change = []
     item1, item2 = arr1[0].shape, arr2[0].shape
@@ -1994,93 +2017,93 @@ def draw_difference(arr1x, arr2x, scale_from=0, custom_levels=None,
                 else:
                     change.append(("arr1", k, item2[k], item1, item2))
 
-    if len(change)>0:
-#         print ('change: ',change)
-        change = list(set(change)) # to remove duplicates
-#         print ('change: ',change)
+    if len(change) > 0:
+        #         print ('change: ',change)
+        change = list(set(change))  # to remove duplicates
+        #         print ('change: ',change)
         for case in change:
-            arrx, ax,  dimens, _ , __ = case
-#             print ('\nfor the case: ', case)
+            arrx, ax, dimens, _, __ = case
+            #             print ('\nfor the case: ', case)
             if isinstance(dimens, tuple):
-                    print ('dimens is a tuple = ', dimens)
-                    dimens=dimens[0]
+                print('dimens is a tuple = ', dimens)
+                dimens = dimens[0]
 
             if ax == 0:
                 # if it is Z axis, we will take the bottom rows only because
                 # Z starts negative to zero, and we want to keep the zero row.
 
-                for item in (0,1,2,4):
+                for item in (0, 1, 2, 4):
                     # the first three items are 2D arrays (Z, X), while the fourth
                     # and fifth are 1D arrays of (X,), (Z,) respectively
                     if arrx == "arr2":
-                        arr2[item] = arr2[item][dimens+1:,...]
+                        arr2[item] = arr2[item][dimens + 1:, ...]
                     else:
-                        arr1[item] = arr1[item][dimens+1:,...]
+                        arr1[item] = arr1[item][dimens + 1:, ...]
 
-            else: # ax=1
+            else:  # ax=1
                 # for the X axis, we want to keep the right part.
-                for item in (0,1,2,3):
+                for item in (0, 1, 2, 3):
                     if arrx == "arr2":
-#                         print ('item = ', item)
-#                         print(type(arr2[item]))
-#                         print(arr2[item].shape)
-#                         print(dimens + 1)
+                        #                         print ('item = ', item)
+                        #                         print(type(arr2[item]))
+                        #                         print(arr2[item].shape)
+                        #                         print(dimens + 1)
                         arr2[item] = arr2[item][..., :dimens]
-#                         print ('this item was done successfully')
+                    #                         print ('this item was done successfully')
                     else:
                         arr1[item] = arr1[item][..., :dimens]
 
-#     for arrx in (arr1, arr2):
-#         for item in arrx:
-#             print (item.shape, end="; ")
-#         print()
-#     print ('-------------------------------')
-#     return 1,2,3,4,5,"Done for now"
-#     print(type(arr1), type(arr2))
-#     print(len(arr1), len(arr2))
+    #     for arrx in (arr1, arr2):
+    #         for item in arrx:
+    #             print (item.shape, end="; ")
+    #         print()
+    #     print ('-------------------------------')
+    #     return 1,2,3,4,5,"Done for now"
+    #     print(type(arr1), type(arr2))
+    #     print(len(arr1), len(arr2))
 
     # To draw diffecence between two contour maps
-    if scale_from ==2:
-        _x, _z, _m , _levels= arr2
-        difference_matrix = arr2[2]-arr1[2]
+    if scale_from == 2:
+        _x, _z, _m, _levels = arr2
+        difference_matrix = arr2[2] - arr1[2]
     else:
-        _x, _z, _m , _levels= arr1
-        difference_matrix = arr1[2]-arr2[2]
+        _x, _z, _m, _levels = arr1
+        difference_matrix = arr1[2] - arr2[2]
         pass
-    
+
     if not no_contours:
-        if scale_from ==0:
-            _ti="Difference between two contours, Specific scale"
+        if scale_from == 0:
+            _ti = "Difference between two contours, Specific scale"
             fig = draw_contour(_x, _z, difference_matrix, levels=custom_levels,
-                         plot_title=_ti,
-                         x_step=x_step, z_step=z_step, 
-                         mirror_x=mirror_x, mirror_z=mirror_z,
-                         return_figure_object=return_figure_object, fig_size=fig_size);
+                               plot_title=_ti,
+                               x_step=x_step, z_step=z_step,
+                               mirror_x=mirror_x, mirror_z=mirror_z,
+                               return_figure_object=return_figure_object, fig_size=fig_size);
         else:
-            _ti="Difference between two contours, Normal scale"
+            _ti = "Difference between two contours, Normal scale"
             fig = draw_contour(_x, _z, difference_matrix, levels=_levels,
-                         plot_title=_ti,
-                         x_step=x_step, z_step=z_step, 
-                         mirror_x=mirror_x, mirror_z=mirror_z,
-                         return_figure_object=return_figure_object, fig_size=fig_size);
+                               plot_title=_ti,
+                               x_step=x_step, z_step=z_step,
+                               mirror_x=mirror_x, mirror_z=mirror_z,
+                               return_figure_object=return_figure_object, fig_size=fig_size);
     if not return_calculations and return_figure_object:
         return fig
-    
+
     if calculate_volume_percent:
         base_array = _m
-        base_volumes = integrate_volume(_x[0], _z[:,0], base_array, 
-                                get_average=calculate_average, 
-                                separate_negatives=separate_negatives)
-        
-        diff_volumes = integrate_volume(_x[0], _z[:,0], difference_matrix, 
-                                get_average=calculate_average, 
-                                separate_negatives=separate_negatives)
-#         print (base_volumes, diff_volumes,'\n')
-        if isinstance(diff_volumes,tuple):
-            prc_vol= list(diff_volumes)
-        else: # Numpy array
+        base_volumes = integrate_volume(_x[0], _z[:, 0], base_array,
+                                        get_average=calculate_average,
+                                        separate_negatives=separate_negatives)
+
+        diff_volumes = integrate_volume(_x[0], _z[:, 0], difference_matrix,
+                                        get_average=calculate_average,
+                                        separate_negatives=separate_negatives)
+        #         print (base_volumes, diff_volumes,'\n')
+        if isinstance(diff_volumes, tuple):
+            prc_vol = list(diff_volumes)
+        else:  # Numpy array
             prc_vol = diff_volumes.tolist()
-        
+
         if calculate_average & separate_negatives:
             # the resturns will be in the form: ((Vol, Th, A), (Vol, Th, A), 
             #                                   (Vol, Th, A))
@@ -2088,7 +2111,7 @@ def draw_difference(arr1x, arr2x, scale_from=0, custom_levels=None,
             for res in range(3):
                 prc_vol.append(diff_volumes[res][0] / base_volumes[2][0])
                 pass
-#             prc_vol[-2] = prc_vol[-1]-prc_vol[-3]
+        #             prc_vol[-2] = prc_vol[-1]-prc_vol[-3]
         elif calculate_average & (not separate_negatives):
             # the resturns will be in the form: (Vol, Th, A)
             prc_vol.append(diff_volumes[0] / base_volumes[0])
@@ -2100,23 +2123,21 @@ def draw_difference(arr1x, arr2x, scale_from=0, custom_levels=None,
             for res in range(3):
                 prc_vol.append(diff_volumes[res] / base_volumes[res])
                 pass
-        else: #(not calculate_average) & (not separate_negatives)
+        else:  # (not calculate_average) & (not separate_negatives)
             # the resturns will be in the form: Vol
-            prc_vol=(prc_vol, diff_volumes / base_volumes)
+            prc_vol = (prc_vol, diff_volumes / base_volumes)
             pass
-        
+
         if return_figure_object:
-            return tuple(prc_vol),fig
+            return tuple(prc_vol), fig
         else:
             return tuple(prc_vol)
-                           
-                           
-            
+
     if calculate_volume:
-        Lx, Lz = _x[0], _z[:,0]
-        calcs= integrate_volume(Lx, Lz, difference_matrix,
-                                get_average=calculate_average, 
-                                separate_negatives=separate_negatives)
+        Lx, Lz = _x[0], _z[:, 0]
+        calcs = integrate_volume(Lx, Lz, difference_matrix,
+                                 get_average=calculate_average,
+                                 separate_negatives=separate_negatives)
         if return_figure_object:
             return calcs, fig
         else:
@@ -2125,8 +2146,8 @@ def draw_difference(arr1x, arr2x, scale_from=0, custom_levels=None,
     # If both calculate_volume=False, and no_contours=False, 
     # it will return None with a warning
     if no_contours and not calculate_volume:
-        print ("Warning, both calculate_volume and no_contours are set to False")
-        print ("         Please set at least one argument to True.")
+        print("Warning, both calculate_volume and no_contours are set to False")
+        print("         Please set at least one argument to True.")
         return None
 
 
@@ -2200,76 +2221,75 @@ def draw_difference(arr1x, arr2x, scale_from=0, custom_levels=None,
 
 
 def get_results_for_grid(arr1, arr2, scale_from=0,
-                        grid=(7, 5)):
+                         grid=(7, 5)):
     """
     
     
     """
     # To draw diffecence between two contour maps
-    if scale_from ==2:
-        _x, _z, _m , _levels= arr2
+    if scale_from == 2:
+        _x, _z, _m, _levels = arr2
     else:
-        _x, _z, _m , _levels= arr1
+        _x, _z, _m, _levels = arr1
         pass
-    
+
     # identify grid limits
     g_x, g_z = grid
-    l_x, l_z = _x.shape[0],_x.shape[1]
+    l_x, l_z = _x.shape[0], _x.shape[1]
     # get quotient and remainder of each dimension
     n_x, n_z = l_x // g_x, l_z // g_z
     r_x, r_z = l_x % g_x, l_z % g_z
     #
-    lst_x, lst_z= [[0, n_x] for _ in range (g_x)], [[0, n_z] for _ in range (g_z)]
-    #determining initiation and ending of the grid
+    lst_x, lst_z = [[0, n_x] for _ in range(g_x)], [[0, n_z] for _ in range(g_z)]
+    # determining initiation and ending of the grid
     x_i, x_e, z_i, z_e = r_x // 2, r_x // 2, r_z // 2, r_z // 2
     x_i += r_x % 2
     z_i += r_z % 2
     lst_x[0][1] += x_i + 1
-    lst_x[-1][1] = l_x +1
+    lst_x[-1][1] = l_x + 1
     lst_z[0][1] += z_i + 1
     lst_z[-1][1] = l_z + 1
     for i in range(1, g_x):
-        lst_x[i][0]=lst_x[i-1][1]
-        lst_x[i][1]=lst_x[i][0] + n_x + 1
+        lst_x[i][0] = lst_x[i - 1][1]
+        lst_x[i][1] = lst_x[i][0] + n_x + 1
     for i in range(1, g_z):
-        lst_z[i][0]=lst_z[i-1][1]
-        lst_z[i][1]=lst_z[i][0] + n_z + 1
+        lst_z[i][0] = lst_z[i - 1][1]
+        lst_z[i][1] = lst_z[i][0] + n_z + 1
 
-    results=[]
+    results = []
     for j, x_g in enumerate(lst_x):
         x_gi, x_ge = x_g
         for k, z_g in enumerate(lst_z):
             z_gi, z_ge = z_g
-            s_arr1=[0,0,0,0]
-            s_arr2=[0,0,0,0]
+            s_arr1 = [0, 0, 0, 0]
+            s_arr2 = [0, 0, 0, 0]
             for i in range(3):
-                s_arr1[i] = arr1[i][x_gi:x_ge:,z_gi:z_ge]
-                s_arr2[i] = arr2[i][x_gi:x_ge:,z_gi:z_ge]
+                s_arr1[i] = arr1[i][x_gi:x_ge:, z_gi:z_ge]
+                s_arr2[i] = arr2[i][x_gi:x_ge:, z_gi:z_ge]
             s_arr2[3] = arr2[3]
             s_arr1[3] = arr1[3]
-            temp_results1 = draw_difference(s_arr1, s_arr2, calculate_volume=True, 
-                            scale_from=scale_from,
-                            custom_levels=get_legend_range(0, 0.2),
-                            calculate_average=True, no_contours=True, 
-                            separate_negatives=True, 
-                            calculate_volume_percent=True)
-            tr1= temp_results1
+            temp_results1 = draw_difference(s_arr1, s_arr2, calculate_volume=True,
+                                            scale_from=scale_from,
+                                            custom_levels=get_legend_range(0, 0.2),
+                                            calculate_average=True, no_contours=True,
+                                            separate_negatives=True,
+                                            calculate_volume_percent=True)
+            tr1 = temp_results1
             temp_results2 = (j, k, s_arr1[0].mean(), s_arr1[1].mean(),
-                             len(s_arr1[2]), np.nanmean(s_arr1[2]), 
-                             np.nanmin(s_arr1[2]), np.nanmax(s_arr1[2]), 
-                             np.nanstd(s_arr1[2]),  
-                             tr1[0][2], tr1[0][0], tr1[0][1], 
-                             tr1[1][0], tr1[1][1], tr1[2][0], tr1[2][1], 
-                             tr1[3]*100., tr1[4]*100., tr1[5]*100.) 
-            
+                             len(s_arr1[2]), np.nanmean(s_arr1[2]),
+                             np.nanmin(s_arr1[2]), np.nanmax(s_arr1[2]),
+                             np.nanstd(s_arr1[2]),
+                             tr1[0][2], tr1[0][0], tr1[0][1],
+                             tr1[1][0], tr1[1][1], tr1[2][0], tr1[2][1],
+                             tr1[3] * 100., tr1[4] * 100., tr1[5] * 100.)
 
             results.append(temp_results2)
-    results_head=['x_cord', 'z_cord', 'x_average', 'z_average', 
-                  'm_count', 'm_average', 'm_min', 'm_max', 'm_std', 
-                  'element_area', 'dif_vol_positive', 'dif_avg_positive', 
-                  'dif_vol_negative', 'dif_avg_negative', 
-                  'dif_vol_all', 'dif_avg_all', 'pos_vol_ratio%', 'neg_vol_ratio%',
-                  'full_vol_ratio%']
+    results_head = ['x_cord', 'z_cord', 'x_average', 'z_average',
+                    'm_count', 'm_average', 'm_min', 'm_max', 'm_std',
+                    'element_area', 'dif_vol_positive', 'dif_avg_positive',
+                    'dif_vol_negative', 'dif_avg_negative',
+                    'dif_vol_all', 'dif_avg_all', 'pos_vol_ratio%', 'neg_vol_ratio%',
+                    'full_vol_ratio%']
     df_vol_results = pd.DataFrame.from_records(results, columns=results_head)
     return df_vol_results
 
@@ -2286,21 +2306,22 @@ def get_results_for_grid(arr1, arr2, scale_from=0,
 # ======= 1- Moving TXT files to speciial folder ============
 # ===========================================================
 def move_hydrus_txt_to_folder(source_folder, HYDRUS_TXT):
-
-    ll=list(os.walk(source_folder))
-    soils_folders=ll[0][1]
+    ll = list(os.walk(source_folder))
+    soils_folders = ll[0][1]
     i = -1
     frames = []
     for soil in soils_folders:
-        subfolder= os.path.join(source_folder, soil)
-        ll=list(os.walk(subfolder))
-        simul_folders =ll[0][1]
-        print ('\n',soil, len(simul_folders), end=' Copying... ')
+        subfolder = os.path.join(source_folder, soil)
+        ll = list(os.walk(subfolder))
+        simul_folders = ll[0][1]
+        print('\n', soil, len(simul_folders), end=' Copying... ')
 
         copy_required_files_and_folders(subfolder, HYDRUS_TXT)
 
-        print ('Done.')
+        print('Done.')
     pass
+
+
 # move_hydrus_txt_to_folder()
 
 
@@ -2315,12 +2336,14 @@ def move_hydrus_txt_to_folder(source_folder, HYDRUS_TXT):
 
 # To convert HYDRUS files to CSV
 def convert_HYDRUS_files_to_CSV(HYDRUS_TXT, HYDRUS_CSV):
-    retrieve_all_csv_files(HYDRUS_TXT, 
-                       get='all',
-                       retrieve_folders_only=False,
-                       get_only_new=True,
-                       output_folder=HYDRUS_CSV)
+    retrieve_all_csv_files(HYDRUS_TXT,
+                           get='all',
+                           retrieve_folders_only=False,
+                           get_only_new=True,
+                           output_folder=HYDRUS_CSV)
     pass
+
+
 # convert_HYDRUS_files_to_CSV()
 
 
@@ -2336,10 +2359,11 @@ def convert_HYDRUS_files_to_CSV(HYDRUS_TXT, HYDRUS_CSV):
 # # 1 file was having errors, we have built its CSV as follows
 def add_missing_csv(HYDRUS_TXT, HYDRUS_CSV, missing_folder_name):
     retrieve_all_csv_files(HYDRUS_TXT,
-                       get=missing_folder_name,
-                       retrieve_folders_only=False,
-                       get_only_new=False,
-                       output_folder=HYDRUS_CSV)
+                           get=missing_folder_name,
+                           retrieve_folders_only=False,
+                           get_only_new=False,
+                           output_folder=HYDRUS_CSV)
+
 
 # missing_folder_name = 'pXZ_3D_srf_Silt_sht_rO1f'
 # add_missing_csv(missing_folder_name)
@@ -2356,11 +2380,12 @@ def add_missing_csv(HYDRUS_TXT, HYDRUS_CSV, missing_folder_name):
 
 def check_file_list(source):
     # Check everything OK
-    FileNames=list(retrieve_all_csv_files(source, get='all',
-                                          retrieve_folders_only=True).values())
+    FileNames = list(retrieve_all_csv_files(source, get='all',
+                                            retrieve_folders_only=True).values())
     print(FileNames)
     print(list(map(len, FileNames)))
     pass
+
 
 # check_file_list()
 
@@ -2373,61 +2398,62 @@ def check_file_list(source):
 # ===========================================================
 
 
-def get_dataframes_from_csv(source,output,  process_from_the_csv_folder = True):
+def get_dataframes_from_csv(source, output, process_from_the_csv_folder=True):
     # If the CSV files already exist, then set this flag to True
     # process_from_the_csv_folder = True
 
-    df2d, df3d=[],[]
-    file_names={}
-    file_number =-1
-    dict_3d={}
+    df2d, df3d = [], []
+    file_names = {}
+    file_number = -1
+    dict_3d = {}
 
     if process_from_the_csv_folder:
         items = glob.glob(output + '/*')
-        subfolders=[]
+        subfolders = []
         for n_folder in items:
             subfolders.append(n_folder.split('\\')[-1][:-4])
         pass
     else:
         # define file names
-        subfolders= retrieve_all_csv_files(source, get='all', retrieve_folders_only=True)
+        subfolders = retrieve_all_csv_files(source, get='all', retrieve_folders_only=True)
         subfolders = list(subfolders.values())
 
-    the_2d_files= list(filter(lambda x: '_2D_' in x, subfolders))
-    the_3d_files= list(filter(lambda x: '_3D_' in x, subfolders))
-    print ('Processing {} files, from which {} 3D files, and {} 2D files.'.
+    the_2d_files = list(filter(lambda x: '_2D_' in x, subfolders))
+    the_3d_files = list(filter(lambda x: '_3D_' in x, subfolders))
+    print('Processing {} files, from which {} 3D files, and {} 2D files.'.
           format(len(subfolders), len(the_3d_files), len(the_2d_files)))
     # print (the_2d_files, the_3d_files)
 
     # store dataframes from files
     for file in the_2d_files:
-        file_number +=1
+        file_number += 1
         filename = '{}.CSV'.format(file)
         file_names[file_number] = filename
         df2d.append(get_df_from_csv(output, filename))
     for i, file in enumerate(the_3d_files):
-        file_number +=1
+        file_number += 1
         filename = '{}.CSV'.format(file)
         file_names[file_number] = filename
-        dict_3d[i]= file_number
+        dict_3d[i] = file_number
         df3d.append(get_df_from_csv(output, filename))
     # print info about each dataframe
     # print (file_names)
-    dims={}
-    time_steps={}
+    dims = {}
+    time_steps = {}
     section_locations = np.array([0.5, 0.6, 0.75, 0.9])
-    sections={}
+    sections = {}
     for i, data_frame in enumerate(df2d + df3d):
-        print('{:3d}-For the case study     : {}'.format(i+1, (the_2d_files+the_3d_files)[i]))
+        print('{:3d}-For the case study     : {}'.format(i + 1, (the_2d_files + the_3d_files)[i]))
         dims[i] = get_full_dimensions(data_frame)
         print('    The full dimensions are: ', dims[i])
         time_steps[i] = get_available_timesteps(data_frame)
         print('    The available timesteps: ', time_steps[i])
         if 'y' in dims[i]:
-            sections[i]=dims[i]['y'][0]+section_locations *  (dims[i]['y'][1]-dims[i]['y'][0])
+            sections[i] = dims[i]['y'][0] + section_locations * (dims[i]['y'][1] - dims[i]['y'][0])
             print('    The sections to study  : ', sections[i])
 
     return df2d, df3d, file_names, dict_3d, dims, time_steps, sections
+
 
 # df2d, df3d, file_names, dict_3d, dims, time_steps, sections = get_dataframes_from_csv()
 
@@ -2441,11 +2467,10 @@ def get_dataframes_from_csv(source,output,  process_from_the_csv_folder = True):
 # ===========================================================
 
 
-def calculate_gridded_and_full_volumes(file_names,dict_3d, df2d, df3d,
+def calculate_gridded_and_full_volumes(file_names, dict_3d, df2d, df3d,
                                        sections, time_steps,
-                                       variable=0, section='y', tol= 10.,
-                                      grid= 0.25, levels= get_legend_range(0.05, 0.45)):
-
+                                       variable=0, section='y', tol=10.,
+                                       grid=0.25, levels=get_legend_range(0.05, 0.45)):
     # Define main variables
     # variable   = 0 # Theta
     # section    ='y'
@@ -2453,40 +2478,40 @@ def calculate_gridded_and_full_volumes(file_names,dict_3d, df2d, df3d,
     # grid       = 0.25 # cm
     # levels     = get_legend_range(0.05, 0.45)
 
-
     out_frame = []
     # the gridded results dataframe
     grid_res_df = pd.DataFrame()
     # Looping through all 3D files and 2D files
     case_number = -1
-    for i, data_frame_3d in enumerate(df3d): #[:1]):######
+    for i, data_frame_3d in enumerate(df3d):  # [:1]):######
 
-        name3d= file_names[dict_3d[i]]
+        name3d = file_names[dict_3d[i]]
 
         # Finding the characteristics of the 3D file
         # if the file is named 'pXZ_3D_sub_sand_cyl_2f.CSV'
         # it will be ['pXZ', '3D', 'sub', 'sand', 'cyl', '2f']
-        name_parts_3d=name3d[:-4].replace("_", " ").split()
+        name_parts_3d = name3d[:-4].replace("_", " ").split()
 
         # Check if the *3D contour* is axisymmetric
         # THis will result in splitting the 3d contour in half to show only
         # the right quarter
-        if name_parts_3d[0]=='Axi':
-            axisym=True
+        if name_parts_3d[0] == 'Axi':
+            axisym = True
         else:
-            axisym=False
+            axisym = False
 
         # Drawing contours of selected timesteps
         # for the axisymmetric section, we want only the middle crossection
         # cross_sections = sections[dict_3d[i]][0] if axisym else sections[dict_3d[i]]
         cross_sections = sections[dict_3d[i]]
-        for crosses in cross_sections: #[:1]:######
-            for time_step in time_steps[dict_3d[i]][1:]: ########## [1:2]
+        for crosses in cross_sections:  # [:1]:######
+            for time_step in time_steps[dict_3d[i]][1:]:  ########## [1:2]
                 # Plotting and calculating the 3D file
-                plot_title = "Cross sectional contour of {} after time value={}.                 CS@ {} direction, crossing at {}={} cm".                            format({0:'Theta', 1:'Head'}[variable], time_step,
-                                  {'x': 'Y-Z', 'y':'X-Z'}[section], section, crosses)
+                plot_title = "Cross sectional contour of {} after time value={}.                 CS@ {} direction, crossing at {}={} cm".format(
+                    {0: 'Theta', 1: 'Head'}[variable], time_step,
+                    {'x': 'Y-Z', 'y': 'X-Z'}[section], section, crosses)
                 # cont_y3D will hold a tuple of (X, Y, Z)
-                cont_y3D = draw_full_contour(data_frame_3d,variable, time_step,
+                cont_y3D = draw_full_contour(data_frame_3d, variable, time_step,
                                              grid, crosses, tol, section,
                                              levels, plot_title,
                                              x_step=15, z_step=25,
@@ -2498,12 +2523,12 @@ def calculate_gridded_and_full_volumes(file_names,dict_3d, df2d, df3d,
                                              return_figure_object=False)
 
                 # Plotting and calculating the 2D files
-                for j, data_frame_2d in enumerate(df2d): #[:1]):#######
-                    name2d=file_names[j]
+                for j, data_frame_2d in enumerate(df2d):  # [:1]):#######
+                    name2d = file_names[j]
                     # be sure the 2D file and the 3D file match each other
-                    name_parts_2d=name2d[:-4].replace("_", " ").split()
+                    name_parts_2d = name2d[:-4].replace("_", " ").split()
                     fail = False
-                    for part in [0, 2, 3]:# axi/pxz, sub/srf, soil_tex
+                    for part in [0, 2, 3]:  # axi/pxz, sub/srf, soil_tex
                         if name_parts_3d[part] != name_parts_2d[part]:
                             fail = True
                             pass
@@ -2511,9 +2536,9 @@ def calculate_gridded_and_full_volumes(file_names,dict_3d, df2d, df3d,
                         # Continue the loop without processing further
                         continue
                     plot_title = "2D cross sectional contour of {} "
-                    plot_title += "after time value={}.".                        format({0:'Theta', 1:'Head'}[variable], time_step)
+                    plot_title += "after time value={}.".format({0: 'Theta', 1: 'Head'}[variable], time_step)
                     # cont will hold a tuple of (X, Y, Z)
-                    cont_y2d = draw_full_contour(data_frame_2d,variable,
+                    cont_y2d = draw_full_contour(data_frame_2d, variable,
                                                  time_step, grid, crosses,
                                                  tol, section,
                                                  levels, plot_title,
@@ -2524,36 +2549,35 @@ def calculate_gridded_and_full_volumes(file_names,dict_3d, df2d, df3d,
                                                  return_arrays=True,
                                                  return_figure_object=False)
 
-                    Tp, Tn, Tt, Vp, Vn, Vt =  draw_difference(cont_y3D, cont_y2d,
-                                                  scale_from=0,
-                                                  custom_levels=get_legend_range(
-                                                      -.1, 0.2),
-                                                  mirror_x=not axisym,
-                                                  calculate_volume=True,
-                                                  calculate_average=True,
-                                                  no_contours=True,
-                                                  separate_negatives=True,
-                                                  calculate_volume_percent= True,
-                                                  return_calculations=True,
-                                                  return_figure_object=False)
+                    Tp, Tn, Tt, Vp, Vn, Vt = draw_difference(cont_y3D, cont_y2d,
+                                                             scale_from=0,
+                                                             custom_levels=get_legend_range(
+                                                                 -.1, 0.2),
+                                                             mirror_x=not axisym,
+                                                             calculate_volume=True,
+                                                             calculate_average=True,
+                                                             no_contours=True,
+                                                             separate_negatives=True,
+                                                             calculate_volume_percent=True,
+                                                             return_calculations=True,
+                                                             return_figure_object=False)
 
                     part5 = name_parts_2d[5] if len(
-                        name_parts_2d[5])<=3 else name_parts_2d[5][1:4]
+                        name_parts_2d[5]) <= 3 else name_parts_2d[5][1:4]
                     case_number += 1
                     outs = (case_number, name_parts_2d[0], name_parts_2d[2],
                             name_parts_2d[3], name_parts_2d[4], part5, crosses,
-                            time_step, Tp[0], Tn[0], Tt[0], Tp[1],Tn[1], Tt[1],
-                            Vp*100., Vn*100., Vt*100., name3d[:-4])
+                            time_step, Tp[0], Tn[0], Tt[0], Tp[1], Tn[1], Tt[1],
+                            Vp * 100., Vn * 100., Vt * 100., name3d[:-4])
                     out_frame.append(outs)
 
                     # Create the gridded difference dataframe
                     tab_df = get_results_for_grid(cont_y3D, cont_y2d)
-                    tab_df['case_number']=case_number
-                    if sum(grid_res_df.shape) ==0:
-                        grid_res_df=tab_df.copy()
+                    tab_df['case_number'] = case_number
+                    if sum(grid_res_df.shape) == 0:
+                        grid_res_df = tab_df.copy()
                     else:
-                        grid_res_df= pd.concat([grid_res_df, tab_df])
-
+                        grid_res_df = pd.concat([grid_res_df, tab_df])
 
                     print(case_number, name2d, name3d, part5, crosses, time_step)
                     pass
@@ -2561,6 +2585,7 @@ def calculate_gridded_and_full_volumes(file_names,dict_3d, df2d, df3d,
             pass
         pass
     return out_frame, grid_res_df
+
 
 # out_data_frame, grid_res_df = calculate_gridded_and_full_volumes()
 # title_print='| n |Axi|sub|soil|elm|emtr|CS | TS |PosVol| NegVol \
@@ -2579,15 +2604,17 @@ def calculate_gridded_and_full_volumes(file_names,dict_3d, df2d, df3d,
 def print_date_and_time():
     import time
     import datetime
-    print ('Time now using `datetime.datetime` module')
+    print('Time now using `datetime.datetime` module')
     print('now()\t\t\t', datetime.datetime.now())
     print('now().time()\t\t', datetime.datetime.now().time())
     print('now().strftime()\t', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    print ('\nTime now using `time` module')
+    print('\nTime now using `time` module')
     print('strftime(), gmtime()\t', time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
     print('ctime()\t\t\t', time.ctime())
-    print ('\nTime now using `pandas` module')
-    print ('datetime.now()\t\t', pd.datetime.now())
+    print('\nTime now using `pandas` module')
+    print('datetime.now()\t\t', pd.datetime.now())
+
+
 # print_date_and_time()
 
 
@@ -2600,43 +2627,43 @@ def print_date_and_time():
 # ============ More efficient handling to the files =========
 # ===========================================================
 
-def export_png_pictures_more_efficient(variable=0, section='y', tol= 10.,
-                                      grid= 0.25, levels= get_legend_range(0.05, 0.45)):
-
-    tb="  "
+def export_png_pictures_more_efficient(variable=0, section='y', tol=10.,
+                                       grid=0.25, levels=get_legend_range(0.05, 0.45)):
+    tb = "  "
     # Looping through all 3D files and 2D files
     case_number = -1
-    for i, data_frame_3d in enumerate(df3d): #[:1]):######
+    for i, data_frame_3d in enumerate(df3d):  # [:1]):######
 
-        name3d= file_names[dict_3d[i]]
+        name3d = file_names[dict_3d[i]]
 
         # Finding the characteristics of the 3D file
         # if the file is named 'pXZ_3D_sub_sand_cyl_2f.CSV'
         # it will be ['pXZ', '3D', 'sub', 'sand', 'cyl', '2f']
-        name_parts_3d=name3d[:-4].replace("_", " ").split()
+        name_parts_3d = name3d[:-4].replace("_", " ").split()
         np3d = name_parts_3d
         name3D_mod = '_'.join([np3d[3], np3d[1], np3d[0], np3d[2], np3d[4], np3d[5]])
         # Check if the *3D contour* is axisymmetric
         # THis will result in splitting the 3d contour in half to show only
         # the right quarter
-        if name_parts_3d[0]=='Axi':
-            axisym=True
+        if name_parts_3d[0] == 'Axi':
+            axisym = True
         else:
-            axisym=False
+            axisym = False
 
         print('{}-For 3D file: {}'.format(i, name3d[:-4]))
         # Drawing contours of selected timesteps
         # for the axisymmetric section, we want only the middle crossection
         # cross_sections = sections[dict_3d[i]][0] if axisym else sections[dict_3d[i]]
         cross_sections = sections[dict_3d[i]]
-        dict_2d_contours={}
-        for crosses in cross_sections: #[:1]:######
-            for tt, time_step in enumerate(time_steps[dict_3d[i]][1:]): ########## [1:2]
+        dict_2d_contours = {}
+        for crosses in cross_sections:  # [:1]:######
+            for tt, time_step in enumerate(time_steps[dict_3d[i]][1:]):  ########## [1:2]
                 # Plotting and calculating the 3D file
-                fig3D_name= '{}__t{}c{}'.format(name3D_mod,tt,int(crosses))
-                print(tb,'Cross section {} and timestep {}'.format(crosses, time_step), end=' ...')
-                plot_title = "Cross sectional contour of {} after time value={}.                 CS@ {} direction, crossing at {}={} cm".                            format({0:'Theta', 1:'Head'}[variable], time_step,
-                                  {'x': 'Y-Z', 'y':'X-Z'}[section], section, crosses)
+                fig3D_name = '{}__t{}c{}'.format(name3D_mod, tt, int(crosses))
+                print(tb, 'Cross section {} and timestep {}'.format(crosses, time_step), end=' ...')
+                plot_title = "Cross sectional contour of {} after time value={}.                 CS@ {} direction, crossing at {}={} cm".format(
+                    {0: 'Theta', 1: 'Head'}[variable], time_step,
+                    {'x': 'Y-Z', 'y': 'X-Z'}[section], section, crosses)
                 # cont_y3D will hold a tuple of (X, Y, Z)
                 if os.path.isfile(os.path.join(figput, '{}.png'.format(fig3D_name))):
                     print('EXISTS, the 3D file {} and its followers will be excluded'.format(fig3D_name))
@@ -2644,22 +2671,22 @@ def export_png_pictures_more_efficient(variable=0, section='y', tol= 10.,
                     # No further commands will be processed for 2D and differences.
 
                 try:
-                    cont_y3D_full = draw_full_contour(data_frame_3d,variable, time_step,
-                                     grid, crosses, tol, section,levels,
-                                     plot_title, x_step=15, z_step=25,
-                                     mirror_x=not axisym, mirror_z=False,
-                                     is2d=False, output_the_contour=False,
-                                     is_axisymmetric=axisym,
-                                     return_arrays=True,
-                                     return_figure_object=True)
+                    cont_y3D_full = draw_full_contour(data_frame_3d, variable, time_step,
+                                                      grid, crosses, tol, section, levels,
+                                                      plot_title, x_step=15, z_step=25,
+                                                      mirror_x=not axisym, mirror_z=False,
+                                                      is2d=False, output_the_contour=False,
+                                                      is_axisymmetric=axisym,
+                                                      return_arrays=True,
+                                                      return_figure_object=True)
                 except:
                     print('ERROR, while processing the 3D file {}.'.format(fig3D_name))
                     # No further commands will be processed for 2D and differences.
                     continue
                 try:
-                    #cont_y3D_full is X, Z, M, levels, fig
-                    cont_y3D = cont_y3D_full [:-1]
-                    fig_3D = cont_y3D_full [ -1]
+                    # cont_y3D_full is X, Z, M, levels, fig
+                    cont_y3D = cont_y3D_full[:-1]
+                    fig_3D = cont_y3D_full[-1]
                     fig_3D.savefig(os.path.join(figput, '{}.png'.format(fig3D_name)))
                     print('Done.')
                 except:
@@ -2667,17 +2694,17 @@ def export_png_pictures_more_efficient(variable=0, section='y', tol= 10.,
                     # Only the 3D PNG is not saved, but the 2D calculation will continue.
 
                 # Plotting and calculating the 2D files
-                for j, data_frame_2d in enumerate(df2d): #[:1]):#######
-                    name2d=file_names[j]
+                for j, data_frame_2d in enumerate(df2d):  # [:1]):#######
+                    name2d = file_names[j]
                     # be sure the 2D file and the 3D file match each other
-                    name_parts_2d=name2d[:-4].replace("_", " ").split()
-                    np2d=name_parts_2d
+                    name_parts_2d = name2d[:-4].replace("_", " ").split()
+                    np2d = name_parts_2d
                     name2D_mod = '_'.join([np2d[3], np2d[1], np2d[0],
                                            np2d[2], np2d[4], np2d[5], '_t{}'.format(tt)])
                     if name2D_mod not in dict_2d_contours.keys():
                         fig2Dpath = os.path.join(figput, '{}.png'.format(name2D_mod))
                         fail = False
-                        for part in [0, 2, 3]:# axi/pxz, sub/srf, soil_tex
+                        for part in [0, 2, 3]:  # axi/pxz, sub/srf, soil_tex
                             if name_parts_3d[part] != name_parts_2d[part]:
                                 fail = True
                                 pass
@@ -2685,28 +2712,28 @@ def export_png_pictures_more_efficient(variable=0, section='y', tol= 10.,
                             # Continue the loop without processing further
                             continue
                         plot_title = "2D cross sectional contour of {} "
-                        plot_title += "after time value={}.".                            format({0:'Theta', 1:'Head'}[variable], time_step)
+                        plot_title += "after time value={}.".format({0: 'Theta', 1: 'Head'}[variable], time_step)
                         # cont will hold a tuple of (X, Y, Z)
-                        print(tb*2,'{}-For the 2D file: {}'.format(j,name2d[:-4]), end=' ...')
+                        print(tb * 2, '{}-For the 2D file: {}'.format(j, name2d[:-4]), end=' ...')
                         try:
-                            cont_y2d_full = draw_full_contour(data_frame_2d,variable,
-                                             time_step, grid, crosses, tol, section,
-                                             levels, plot_title, x_step=15, z_step=25,
-                                             mirror_x=not axisym, mirror_z=False,
-                                             is2d=True, output_the_contour=False,
-                                             return_arrays=True,
-                                             return_figure_object=True)
+                            cont_y2d_full = draw_full_contour(data_frame_2d, variable,
+                                                              time_step, grid, crosses, tol, section,
+                                                              levels, plot_title, x_step=15, z_step=25,
+                                                              mirror_x=not axisym, mirror_z=False,
+                                                              is2d=True, output_the_contour=False,
+                                                              return_arrays=True,
+                                                              return_figure_object=True)
                         except:
                             print('ERROR, while processing the 2D file {}.'.format(name2D_mod))
                             # No further commands will be processed for differences.
                             continue
                         try:
-                            #cont_y2d_full is X, Z, M, levels, fig
-                            cont_y2d = cont_y2d_full [:-1]
-                            fig_2D   = cont_y2d_full [ -1]
+                            # cont_y2d_full is X, Z, M, levels, fig
+                            cont_y2d = cont_y2d_full[:-1]
+                            fig_2D = cont_y2d_full[-1]
                             if not os.path.isfile(fig2Dpath):
                                 fig_2D.savefig(fig2Dpath)
-                                print ('Done')
+                                print('Done')
                             else:
                                 print('{} is found'.format(name2D_mod))
                         except:
@@ -2721,19 +2748,19 @@ def export_png_pictures_more_efficient(variable=0, section='y', tol= 10.,
                     # custom_levels=get_legend_range(-.1, 0.2),
                     # custom_levels=None,
 
-                    print(tb*3,'The difference figure ', end=' ...')
+                    print(tb * 3, 'The difference figure ', end=' ...')
                     fig_dif_name = 'dif_{}_{}'.format(fig3D_name, name2d[16:-4])
 
                     fig_dif = None
                     try:
-                        fig_dif =  draw_difference(cont_y3D, cont_y2d, scale_from=0,
-                                      custom_levels=get_legend_range(-.3, 0.3),
-                                      mirror_x=not axisym, calculate_volume=False,
-                                      calculate_average=False, no_contours=False,
-                                      separate_negatives=False,
-                                      calculate_volume_percent= False,
-                                      return_calculations=False,
-                                      return_figure_object=True)
+                        fig_dif = draw_difference(cont_y3D, cont_y2d, scale_from=0,
+                                                  custom_levels=get_legend_range(-.3, 0.3),
+                                                  mirror_x=not axisym, calculate_volume=False,
+                                                  calculate_average=False, no_contours=False,
+                                                  separate_negatives=False,
+                                                  calculate_volume_percent=False,
+                                                  return_calculations=False,
+                                                  return_figure_object=True)
                     except:
                         print('ERROR, while processing the DIF file {}.'.format(fig_dif_name))
                         continue
@@ -2742,7 +2769,7 @@ def export_png_pictures_more_efficient(variable=0, section='y', tol= 10.,
                             fig_dif_path = os.path.join(figput, '{}.png'.format(fig_dif_name))
                             if not os.path.isfile(fig_dif_path):
                                 fig_dif.savefig(fig_dif_path)
-                                print ('Done')
+                                print('Done')
                             else:
                                 print('{} is found'.format(fig_dif_name))
                         else:
@@ -2757,6 +2784,7 @@ def export_png_pictures_more_efficient(variable=0, section='y', tol= 10.,
     print('All the files were processed as printed above.')
     print('==============================================')
     pass
+
 
 # export_png_pictures_more_efficient()
 
@@ -2922,7 +2950,6 @@ def do_export_pngs():
 # In[98]:
 
 
-
 # In[38]:
 
 
@@ -2934,27 +2961,26 @@ def do_export_pngs():
 
 
 # def calculate_all_data_with_axi_pxz():
-def calculate_all_data_with_axi_pxz(variable=0, section='y', tol= 10.,
-                                      grid= 0.25, levels= get_legend_range(0.05, 0.45)):
+def calculate_all_data_with_axi_pxz(variable=0, section='y', tol=10.,
+                                    grid=0.25, levels=get_legend_range(0.05, 0.45)):
     # Temporary value
     crosses = 0
     # a storage for the 3d cross sections and dataframes
     vault_3d = {}
-
 
     # Here we used "w" letter in our argument, which indicates write and the plus
     # sign that means it will create a file if it does not exist in library
     # The available option beside "w" are "r" for read and "a" for append and
     # plus sign means if it is not there then create it
     # Create files to write line by line
-    dtfmla= datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+    dtfmla = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
     path_full = os.path.join(output, 'Analysis_full_nL{}.CSV'.format(dtfmla))
     path_grid = os.path.join(output, 'Analysis_grid_nL{}.CSV'.format(dtfmla))
     title1 = "n, Axi, sub, soil, elm, emtr, CS, TS, PosVol, NegVol, TotVol, "              "PosAvg, NegAvg, TotAvg, PsV_Pr, NgV_Pr, TtV_Pr, 3D_filename\n"
     title2 = "x_cord, z_cord, x_average, z_average, m_count, m_average, m_min, m_max, "             "m_std, element_area, dif_vol_positive, dif_avg_positive, dif_vol_negative, "             "dif_avg_negative, dif_vol_all, dif_avg_all, pos_vol_ratio%, "             "neg_vol_ratio%, full_vol_ratio%, case_number\n"
-    with open (path_full, 'w', newline='') as f_full, open(path_grid, 'w', newline='') as f_grid:
-    #     f_full = open (os.path.join(output, 'Analysis_full_nL{}.CSV'.format(dtfmla)), 'w+')
-    #     f_grid = open (os.path.join(output, 'Analysis_grid_nL{}.CSV'.format(dtfmla)), 'w+')
+    with open(path_full, 'w', newline='') as f_full, open(path_grid, 'w', newline='') as f_grid:
+        #     f_full = open (os.path.join(output, 'Analysis_full_nL{}.CSV'.format(dtfmla)), 'w+')
+        #     f_grid = open (os.path.join(output, 'Analysis_grid_nL{}.CSV'.format(dtfmla)), 'w+')
         # Defining titles
 
         # Writing titles
@@ -2964,63 +2990,64 @@ def calculate_all_data_with_axi_pxz(variable=0, section='y', tol= 10.,
         write1 = csv.writer(f_full, delimiter=",")
         write2 = csv.writer(f_grid, delimiter=",")
 
-    #     out_frame = []
+        #     out_frame = []
         # the gridded results dataframe
-    #     grid_res_df = pd.DataFrame()
+        #     grid_res_df = pd.DataFrame()
         valid_time_steps = time_steps[dict_3d[1]][1:]
 
         # Starting to loop with 2D files then 3D files
         case_number = -1
-        for j, data_frame_2d in enumerate(df2d): #[:1]):#######
+        for j, data_frame_2d in enumerate(df2d):  # [:1]):#######
             name2d = file_names[j]
             # be sure the 2D file and the 3D file match each other
             name_parts_2d = name2d[:-4].split("_")
             # part5 is the flux form
             part5 = name_parts_2d[5] if len(
-                    name_parts_2d[5])<=3 else name_parts_2d[5][1:4]
-            if name_parts_2d[0]=='Axi':
-                axisym=True
+                name_parts_2d[5]) <= 3 else name_parts_2d[5][1:4]
+            if name_parts_2d[0] == 'Axi':
+                axisym = True
                 the_2d_is_axi = True
             else:
-                axisym=False
+                axisym = False
                 the_2d_is_axi = False
                 pass
             for time_step in valid_time_steps:
-                plot_title = "2D cross sectional contour of {} "                             "after time value={}.".                    format({0:'Theta', 1:'Head'}[variable], time_step)
+                plot_title = "2D cross sectional contour of {} "                             "after time value={}.".format(
+                    {0: 'Theta', 1: 'Head'}[variable], time_step)
                 # cont will hold a tuple of (X, Y, Z)
-    #             cont_y2d = draw_full_contour(data_frame_2d,variable,
-    #                                          time_step, grid, crosses,
-    #                                          tol, section,
-    #                                          levels, plot_title,
-    #                                          x_step=15, z_step=25,
-    #                                          mirror_x=not axisym, mirror_z=False,
-    #                                          is2d=True,
-    #                                          output_the_contour=False,
-    #                                          return_arrays=True,
-    #                                          return_figure_object=False)
+                #             cont_y2d = draw_full_contour(data_frame_2d,variable,
+                #                                          time_step, grid, crosses,
+                #                                          tol, section,
+                #                                          levels, plot_title,
+                #                                          x_step=15, z_step=25,
+                #                                          mirror_x=not axisym, mirror_z=False,
+                #                                          is2d=True,
+                #                                          output_the_contour=False,
+                #                                          return_arrays=True,
+                #                                          return_figure_object=False)
                 # if the dataframe for pXZ, then get two arrays
 
-    #             return data_frame_2d
-    #             time_in = timeit.default_timer()
-                packed_y2d = get_packed_arrays(data_frame_2d,variable,
-                                             time_step, grid, crosses,
-                                             tol, section, is2d=True,
-                                             is_axisymmetric=axisym,
-                                             levels = levels,
-                                             get_two_arrays=not(axisym))
+                #             return data_frame_2d
+                #             time_in = timeit.default_timer()
+                packed_y2d = get_packed_arrays(data_frame_2d, variable,
+                                               time_step, grid, crosses,
+                                               tol, section, is2d=True,
+                                               is_axisymmetric=axisym,
+                                               levels=levels,
+                                               get_two_arrays=not (axisym))
 
-    #             print(type(packed_y2d),len(packed_y2d))
-    #             print('Elapsed time of packed_y2d: {} s'.format(timeit.default_timer() - time_in))
+                #             print(type(packed_y2d),len(packed_y2d))
+                #             print('Elapsed time of packed_y2d: {} s'.format(timeit.default_timer() - time_in))
 
                 # Now looping through the 3D simulations
-                for i, data_frame_3d in enumerate(df3d): #[:1]):######
+                for i, data_frame_3d in enumerate(df3d):  # [:1]):######
 
-                    name3d= file_names[dict_3d[i]]
+                    name3d = file_names[dict_3d[i]]
                     # if the file is named 'pXZ_3D_sub_sand_cyl_2f.CSV'
                     # it will be ['pXZ', '3D', 'sub', 'sand', 'cyl', '2f']
-                    name_parts_3d=name3d[:-4].split("_")
+                    name_parts_3d = name3d[:-4].split("_")
                     fail = False
-                    for part in [2, 3]:# sub/srf, soil_tex
+                    for part in [2, 3]:  # sub/srf, soil_tex
                         if name_parts_3d[part] != name_parts_2d[part]:
                             fail = True
                             pass
@@ -3031,33 +3058,32 @@ def calculate_all_data_with_axi_pxz(variable=0, section='y', tol= 10.,
                     # Check if the *3D contour* is axisymmetric
                     # THis will result in splitting the 3d contour in half to show only
                     # the right quarter
-                    if name_parts_3d[0]=='Axi':
-                        axisym=True
+                    if name_parts_3d[0] == 'Axi':
+                        axisym = True
                         the_3d_is_axi = True
                     else:
-                        axisym=False
+                        axisym = False
                         the_3d_is_axi = False
                         pass
-
 
                     # Drawing contours of selected timesteps
                     # for the axisymmetric section, we want only the middle crossection
                     # cross_sections = sections[dict_3d[i]][0] if axisym else sections[dict_3d[i]]
                     cross_sections = sections[dict_3d[i]]
-                    for crosses in cross_sections: #[:1]:######
+                    for crosses in cross_sections:  # [:1]:######
                         time_in = timeit.default_timer()
                         # if the case exist in the vault, then read it, else calculate then store
                         if (name3d, time_step, crosses) in vault_3d:
                             packed_y3d = vault_3d[(name3d, time_step, crosses)]
                         else:
                             packed_y3d = get_packed_arrays(data_frame_3d, variable, time_step,
-                                                       grid, crosses,  tol, section,
-                                                       is2d=False, is_axisymmetric=axisym,
-                                                       levels = levels,
-                                                       get_two_arrays=not(axisym))
-    #                         print(type(packed_y3d),len(packed_y3d))
+                                                           grid, crosses, tol, section,
+                                                           is2d=False, is_axisymmetric=axisym,
+                                                           levels=levels,
+                                                           get_two_arrays=not (axisym))
+                            #                         print(type(packed_y3d),len(packed_y3d))
                             vault_3d[(name3d, time_step, crosses)] = packed_y3d
-    #                     print('Elapsed time of packed_y3d: {} s'.format(timeit.default_timer() - time_in))
+                        #                     print('Elapsed time of packed_y3d: {} s'.format(timeit.default_timer() - time_in))
 
                         if the_3d_is_axi and not the_2d_is_axi:
                             cont_y3d, cont_y2d = packed_y3d, packed_y2d[1]
@@ -3065,42 +3091,41 @@ def calculate_all_data_with_axi_pxz(variable=0, section='y', tol= 10.,
                             cont_y3d, cont_y2d = packed_y3d[1], packed_y2d
                         elif (not the_2d_is_axi) and (not the_3d_is_axi):  # both are pXZ
                             cont_y3d, cont_y2d = packed_y3d[0], packed_y2d[0]
-                        else: # both are axi
+                        else:  # both are axi
                             cont_y3d, cont_y2d = packed_y3d, packed_y2d
 
-    #                     time_in = timeit.default_timer()
+                        #                     time_in = timeit.default_timer()
 
-    #                     print(type(cont_y3d), type(cont_y2d))
-    #                     print(len(cont_y3d), len(cont_y2d))
+                        #                     print(type(cont_y3d), type(cont_y2d))
+                        #                     print(len(cont_y3d), len(cont_y2d))
 
-                        Tp, Tn, Tt, Vp, Vn, Vt =  draw_difference(cont_y3d, cont_y2d,
-                                                      scale_from=0,
-                                                      custom_levels=get_legend_range(
-                                                          -.1, 0.2),
-                                                      mirror_x=not axisym,
-                                                      calculate_volume=True,
-                                                      calculate_average=True,
-                                                      no_contours=True,
-                                                      separate_negatives=True,
-                                                      calculate_volume_percent= True,
-                                                      return_calculations=True,
-                                                      return_figure_object=False)
-    #                     print('Elapsed time of draw_difference: {} s'.format(timeit.default_timer() - time_in))
-    #                     print(name2d, name3d, time_step, crosses, timeit.default_timer() - time_in)
-    #                     continue
-
+                        Tp, Tn, Tt, Vp, Vn, Vt = draw_difference(cont_y3d, cont_y2d,
+                                                                 scale_from=0,
+                                                                 custom_levels=get_legend_range(
+                                                                     -.1, 0.2),
+                                                                 mirror_x=not axisym,
+                                                                 calculate_volume=True,
+                                                                 calculate_average=True,
+                                                                 no_contours=True,
+                                                                 separate_negatives=True,
+                                                                 calculate_volume_percent=True,
+                                                                 return_calculations=True,
+                                                                 return_figure_object=False)
+                        #                     print('Elapsed time of draw_difference: {} s'.format(timeit.default_timer() - time_in))
+                        #                     print(name2d, name3d, time_step, crosses, timeit.default_timer() - time_in)
+                        #                     continue
 
                         case_number += 1
                         outs = [case_number, name_parts_2d[0], name_parts_2d[2],
                                 name_parts_2d[3], name_parts_2d[4], part5, crosses,
-                                time_step, Tp[0], Tn[0], Tt[0], Tp[1],Tn[1], Tt[1],
-                                Vp*100., Vn*100., Vt*100., name3d[:-4]]
-                        print (len(outs), outs[:3], outs[-3:], end='; ')
+                                time_step, Tp[0], Tn[0], Tt[0], Tp[1], Tn[1], Tt[1],
+                                Vp * 100., Vn * 100., Vt * 100., name3d[:-4]]
+                        print(len(outs), outs[:3], outs[-3:], end='; ')
                         write1.writerow(outs)
 
                         # Create the gridded difference dataframe
                         tab_df = get_results_for_grid(cont_y3d, cont_y2d)
-                        tab_df['case_number']=case_number
+                        tab_df['case_number'] = case_number
                         # the tab_df is a multi-row dataframe, we want it as a list of lists
                         print(tab_df.shape)
                         gridded_results = tab_df.values.tolist()
@@ -3112,7 +3137,6 @@ def calculate_all_data_with_axi_pxz(variable=0, section='y', tol= 10.,
                 pass
             pass
         pass
-
 
 # # In[ ]:
 #
@@ -3150,8 +3174,6 @@ def calculate_all_data_with_axi_pxz(variable=0, section='y', tol= 10.,
 #
 #
 # # In[223]:
-
-
 
 
 # In[320]:

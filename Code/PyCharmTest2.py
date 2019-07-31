@@ -12,7 +12,7 @@ from scipy import integrate
 from NesrHydrusAnalyst import *
 # src = '../Datasets/sample3d'
 src = '../Datasets/H3D2_SandDitch0011'
-data_frame= read_hydrus_data(folder=src, save_to_csv=False)
+data_frame= read_hydrus_data(folder=src, save_to_csv=False, read_velocities=True)
 print(data_frame.shape)
 v=0
 X, Z, M, x_vals, z_vals = get_grid_values(data_frame,variable=v)

@@ -120,7 +120,7 @@ def read_hydrus_data(folder='Current', save_to_csv=True, read_velocities=False):
         times_df = pd.DataFrame([])  # Empty dataframe
         time_loc_start = 2  # The starting cell of the timestep
         # Check if it is a velocity file
-        processing_velocity = (filename == 'V.TXT')
+        processing_velocity = (filename[-5:] == 'V.TXT')
         while time_steps_remaining:
             line_t = linecache.getline(filename, time_loc_start).split()
             # Check if it is the start of the timestep, otherwise exit
@@ -139,14 +139,8 @@ def read_hydrus_data(folder='Current', save_to_csv=True, read_velocities=False):
                 for i in range(time_loc_start + 2, tim_loc_end):
                     time_data.extend(linecache.getline(filename, i).split())
                 # Convert the list to DataFrame
-                if processing_velocity:
-                    dft = pd.DataFrame(np.array(time_data, float),
-                                       columns=['{}_T{}'.format(caption,
-                                                                  velocity_component,
-                                                                  t)])
-                else:
-                    dft = pd.DataFrame(np.array(time_data, float),
-                                       columns=['{}_T{}'.format(caption, t)])
+                dft = pd.DataFrame(np.array(time_data, float),
+                                   columns=['{}_T{}'.format(caption, t)])
                 if len(times_df) == 0:  # If it is the first timestep
                     times_df = dft.copy()
                 else:  # Otherwise (for all other timesteps)

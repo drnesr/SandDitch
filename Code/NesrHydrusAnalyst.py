@@ -1254,6 +1254,11 @@ def get_legend_range(mn, mx):
     return np.arange(rn + step, rx + step, step)
 
 
+def get_legend_range_max(M):
+    '''
+
+    '''
+    return  get_legend_range(np.nanmin(M), np.nanmax(M))
 # In[19]:
 def get_fig_shape(data_frame,
                   selected_dim='y',

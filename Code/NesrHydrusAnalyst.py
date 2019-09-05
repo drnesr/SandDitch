@@ -1157,7 +1157,11 @@ def get_available_timesteps(data_frame):
     '''
     cols = list(data_frame.head())
     mems = list(filter(lambda x: x.find('_T') > 0, cols))
-    return sorted(list(set(map(lambda x: int(float(x.split('=')[1])), mems))))
+    try:
+        outs = sorted(list(set(map(lambda x: int(float(x.split('=')[1])), mems))))
+    except:
+        outs = sorted(list(set(map(lambda x: int(float(x.split('_T')[1])), mems))))
+    return outs
 
 
 # In[15]:

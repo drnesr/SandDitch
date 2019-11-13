@@ -3205,3 +3205,63 @@ def get_full_simulation_info(df):
             f'\nFor the variable {v_mask[vr]}:\nLegend range: ', 
             [float(f'{_:6.5f}') for _ in get_legend_range_max(M)],
             )
+v_mask = {0: 'Th', 1: 'H', 2.1: 'V1', 2.2: 'V2', 2.3: 'V3'}
+def array_rotate_3D(cords, degrees, rotation_axis='X'):
+    '''
+    To find the new coordinates of the rotated shape
+    The shape here is rotated with ONE angle on ONE axis only.
+    
+    cords: the original coordinates 
+            (a numpy array of 3 columns (x, y, z) and n rows)
+    degrees: the angle of rotation (+ve CCW, -ve CW)
+    rotation_axis='X' or 'Y' or 'Z'
+    '''
+    rads = degrees * np.pi / 180.
+    cr, sr = np.cos(rads), np.sin(rads)
+    # x_c, y_c = center
+    # C = np.array(center)  #np.array((x_c, y_c))
+    ax = rotation_axis.lower()
+    if ax == 'x':
+        R = [[1, 0, 0], [0, cr, -sr], [0, sr, cr]]
+    elif ax == 'y':
+        R = [[cr, 0, sr], [0, 1, 0], [-sr, 0, cr]]
+    elif ax == 'z':
+        R = [[cr, -sr, 0], [sr, cr, 0], [0, 0, 1]]
+    else:  # Other
+        print(f'Axis {rotation_axis} is not recognized!')
+        raise ()
+
+    # display(R, cords.T)
+    return np.dot(R, cords.T).T
+
+def rotate_back(df,  degree, rotation_axis='y'):
+    '''
+    A function to rotate back a rotated dataframe by 'Theta' in 'Axis' direction
+    To rotate it back, you must rotate it in '-Theta' angle in the same 'Axis' direction.
+    Inputs:
+    df: the rotated dataframe (pandas format) 
+    degrees: the angle of rotation (+ve CCW, -ve CW)
+    rotation_axis='X' or 'Y' or 'Z' {Not case sensitive}
+    Outputs: None
+    Returns: the unrotated dataframe
+    '''
+    # Create a copy of the dataframe
+    dr=df.copy()
+    # get an array of the xyz coordinates
+    xyz = dr[['x', 'y', 'z']]
+    col_names = xyz.columns
+    # convert to numpy
+    xyz = xyz.to_numpy()
+    xyz = array_rotate_3D(xyz, degree, rotation_axis=rotation_axis)
+    # display(rotX[8249,:])
+    # rotX.min(axis=0), rotX.max(axis=0)
+
+    xyz = pd.DataFrame(xyz, columns=col_names)
+    # display(XYZ.shape, XYZ)
+    # display(XYZ.loc[8250][['x', 'y', 'z']])
+    # XYZ
+    xyz.index += 1
+
+    dr[['x', 'y', 'z']] = xyz.round(3)[['x', 'y', 'z']]
+    # pd.concat([dr.head(5), dr.sample(10), dr.tail(5)])#, ignore_index=True)
+    return dr

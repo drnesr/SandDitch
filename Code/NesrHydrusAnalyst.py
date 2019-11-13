@@ -3184,3 +3184,24 @@ def calculate_all_data_with_axi_pxz(variable=0, section='y', tol=10.,
 
 # tests of get_results_for_grid
 # Before running this test, you should run the '# DRAW 3D sections'  cell first (below)
+def get_full_simulation_info(df):
+    '''
+    Gets the full timesteps, and dimensions for the whole simulation 
+    and the legend ranges for each variable
+    inputs: dataframe
+    outputs: text
+    returns: None
+    '''
+    
+    v_mask ={0: 'Th', 1: 'H', 2.1: 'V1', 2.2: 'V2', 2.3: 'V3'}
+    X, Z, M, x_vals, z_vals = get_grid_values(df)
+    print(' For the entire simulation\n',"="*25,'\nTime steps :', get_available_timesteps(df), '\nDimensions :',
+            get_full_dimensions(df), '\nMatrix dims:','x_vals{}, z_vals{}, X{}, Z{}, M{}'.format(
+                x_vals.shape, z_vals.shape, X.shape, Z.shape, M.shape))
+    print('\n\n For the variables\n',"="*18)
+    for vr in v_mask.keys():
+        X, Z, M, x_vals, z_vals = get_grid_values(df, variable=vr)
+        print(
+            f'\nFor the variable {v_mask[vr]}:\nLegend range: ', 
+            [float(f'{_:6.5f}') for _ in get_legend_range_max(M)],
+            )

@@ -3265,3 +3265,40 @@ def rotate_back(df,  degree, rotation_axis='y'):
     dr[['x', 'y', 'z']] = xyz.round(3)[['x', 'y', 'z']]
     # pd.concat([dr.head(5), dr.sample(10), dr.tail(5)])#, ignore_index=True)
     return dr
+
+def get_variables_extremes(df, returns_dataframe=False):  #, variable=0):
+    '''
+    Returns a dictionary or dataframe 
+    for the minimum, mean, median, and maximum values for each variable.
+    
+    it returns a dictionary by default, 
+    if the returns_dataframe=True, it returns a nice dataframe
+    
+    Example of output:
+    {'Th': (0.0491315, 0.25728877036694847, 0.3117305, 0.43),
+     'H': (-676.912, -66.64586298251317, -19.626, 12.4292),
+     'V1': (-1.66093, -0.021988293736312156, -1.8649299999999998e-05, 0.802749),
+     'V2': (-0.263769, -0.0003310909245689416, 1.83706e-08, 0.265775),
+     'V3': (-1.08642, -0.002843513512347942, -2.684e-05, 0.777201)}
+    '''
+
+    # Find the variable mask
+    v_mask = {0: 'Th', 1: 'H', 2.1: 'V1', 2.2: 'V2', 2.3: 'V3'}  # , 2:'V'
+    outs = {}  #{key: value for key, value in v_mask.items()}
+    timesteps = get_available_timesteps(df)
+    for variable in v_mask.keys():
+        var = v_mask[variable]
+        varnames = [f'{var}_T{timestep}' for timestep in timesteps]
+        vdf = df[varnames]
+        #outs[variable]=(vdf.min().min(), vdf.max().max())
+        outs[v_mask[variable]] = (vdf.min().min(), vdf.mean().mean(),
+                                  vdf.median().median(), vdf.max().max())
+    if returns_dataframe:
+        arr = np.array(list(outs.items()))
+
+        return pd.DataFrame(
+            list(arr[:, 1]),
+            index=arr[:, 0],
+            columns=['Min', 'Mean', 'Median', 'Max'])
+    else:
+        return outs

@@ -1423,13 +1423,25 @@ def draw_contour(X, Z, M, levels=None,
 # In[20]:
 
 
-def draw_full_contour(data_frame, variable=0, time_step=180, grid=0.5,
-                      crosses=35., tol=10., section='x', levels=None,
+def draw_full_contour(data_frame,
+                      variable=0,
+                      time_step=180,
+                      grid=0.5,
+                      crosses=35.,
+                      tol=10.,
+                      section='x',
+                      levels=None,
                       plot_title="ElNesr cross sectional contour map",
-                      return_arrays=True, x_step=None, z_step=None,
-                      mirror_x=False, mirror_z=False, is2d=False,
-                      output_the_contour=True, is_axisymmetric=False,
-                      return_figure_object=False, fig_size=(18, 7)):
+                      return_arrays=True,
+                      x_step=None,
+                      z_step=None,
+                      mirror_x=False,
+                      mirror_z=False,
+                      is2d=False,
+                      output_the_contour=True,
+                      is_axisymmetric=False,
+                      return_figure_object=False,
+                      fig_size=None):
     '''
     Either (1) set the return_arrays to True and use on right 
                 hand side of equal sign, 
@@ -1442,58 +1454,79 @@ def draw_full_contour(data_frame, variable=0, time_step=180, grid=0.5,
     (2)
        draw_full_contour(data_frame,variable, time_step, grid, crosses, 
                            tol, section, return_arrays=False)    
-
     '''
     #     print('is2d=', is2d)
-    X, Z, M, x_vals, z_vals = get_grid_values(data_frame,
-                                              variable,
-                                              time_step, grid, crosses,
-                                              tol, section, is2d=is2d,
-                                              is_axisymmetric=is_axisymmetric,
-                                              get_two_arrays=get_two_arrays)
+    X, Z, M, x_vals, z_vals = get_grid_values(
+        data_frame,
+        variable,
+        time_step,
+        grid,
+        crosses,
+        tol,
+        section,
+        is2d=is2d)
     # print(x_vals.shape, z_vals.shape, X.shape, Z.shape, M.shape)
     if levels is None:
-        levels = get_legend_range(np.nanmin(M), np.nanmax(M))  # np.arange(0.15, 0.42, 0.03)
+        levels = get_legend_range(np.nanmin(M),
+                                  np.nanmax(M))  #np.arange(0.15, 0.42, 0.03)
 
     mn, mx = np.nanmin(M), np.nanmax(M)
     # print (mx,mn, mx-mn)
     if mx - mn < 0.000000001:
-        print('For the requested contour map of {}'.format(plot_title), end='. ')
+        print(
+            'For the requested contour map of {}'.format(plot_title), end='. ')
         print("The map has one value only ({}), no contour map will be drawn.".
               format(mn))
         can_draw_figure = False
     else:
         can_draw_figure = True
 
+    # Adjust a proportional figure size
+    if fig_size is None:
+        fig_size = get_fig_shape(df, section)
+
     if not output_the_contour and not return_figure_object:
         fig = None
     else:
         if can_draw_figure:
-            fig = draw_contour(X, Z, M, levels, plot_title, x_step, z_step,
-                               mirror_x, mirror_z, return_figure_object, fig_size=fig_size);
+            fig = draw_contour(
+                X,
+                Z,
+                M,
+                levels,
+                plot_title,
+                x_step,
+                z_step,
+                mirror_x,
+                mirror_z,
+                return_figure_object,
+                fig_size=fig_size)
         else:
             fig = None
 
-    #     exit()
+
+#     exit()
     if return_arrays:
         if output_the_contour:
             if return_figure_object:
                 return X, Z, M, levels, fig
             else:  # return_figure_object=False
                 display(fig)
+                # fig.show()
                 return X, Z, M, levels
-        else:  # output_the_contour=False
+        else:  #output_the_contour=False
             if return_figure_object:
                 return X, Z, M, levels, fig
             else:  # return_figure_object=False
                 return X, Z, M, levels
-    else:  # return_arrays=False
+    else:  #return_arrays=False
         if output_the_contour:
             if return_figure_object:
                 return fig
             else:  # return_figure_object=False
                 display(fig)
-        else:  # output_the_contour=False
+                # fig.show()
+        else:  #output_the_contour=False
             if return_figure_object:
                 return fig
 

@@ -1288,10 +1288,14 @@ def get_fig_shape(data_frame,
 def draw_contour(X, Z, M, levels=None,
                  plot_title="ElNesr cross sectional contour map",
                  x_step=10., z_step=25., mirror_x=False, mirror_z=False,
-                 return_figure_object=False, fig_size=(18, 7)):
+                 return_figure_object=False, fig_size=None):
     '''
     
     '''
+    if levels is None:
+        levels = get_legend_range(np.nanmin(M),
+                                  np.nanmax(M))
+        
     fig = plt.figure(num=None, figsize=fig_size, dpi=80, facecolor='w', edgecolor='k');
     origin = 'lower'
 

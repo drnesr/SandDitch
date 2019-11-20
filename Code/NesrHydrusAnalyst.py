@@ -3447,3 +3447,51 @@ def get_window_time_volumes(
         time_storage[time_step] = vol
         
     return time_storage
+
+def get_parabola_area(y0, y1, y2, h, k):
+    '''
+    Returns the area under curve of a parabola who's equation 
+    $$y = ax^2 + bx +c$$
+    from the point -h to k
+    where -h crosses at y0
+           0 crosses at y1
+           k crosses at y2
+    '''
+
+    y21 = y2 - y1
+    y10 = y1 - y0
+    khd = k * h * (k + h)
+    a = (h * y21 - k * y10) / khd
+    b = (h * h * y21 + k * k * y10) / khd
+    return a / 3 * (k**3 + h**3) + b / 2 * (k * k - h * h) + y1 * (k + h)
+
+def get_uneven_spans_area(data, show_steps=False):
+    """
+    Calculates the area of a shape based on approximate parabolas
+    Similar to simpson's rule but with un-even spans
+    requires a  numpy array with n data rows, and 2 columns; one for X, 
+    and the other for Y.
+    It can print each individual calculation by the get_parabola_area function
+    if the show_steps parameter is set to True.
+    
+    Note: n must be odd and >=3
+    """
+    area = 0
+    # n must be of odd number and >= 3
+    n = data.shape[0]
+    if n % 2 == 0:
+        print (f"ERROR! The number of points must be odd.")
+        print (f"You provided {n} rows and {data.shape[1]} columns")
+        return None
+    if n < 3:
+        print (f"ERROR! The number of points must be >= 3. ")
+        print (f"You provided {n} rows and {data.shape[1]} columns")
+    for i in range(1, data.shape[0] - 1, 2):
+        y0, y1, y2 = data[i - 1:i + 2, 1]
+        x0, x1, x2 = data[i - 1:i + 2:, 0]
+        h, k = np.abs(x1 - x0), np.abs(x2 - x1)
+        part_area = get_parabola_area(y0, y1, y2, h, k)
+        area += part_area
+        if show_steps:
+            print(i, ": ", x0, y0, x1, y1, x2, y2, h, k, part_area)
+    return area

@@ -3340,3 +3340,110 @@ def rotate_back(df,  degree, rotation_axis='y'):
     return dr
 
 
+def get_window_time_volumes(
+        df,
+        crosses,
+        region_length,
+        region_location,
+        location_is_start=False,  #the region_location =  region_end
+        section='x',
+        grid=0.5,
+        absolute_velocities=True
+        ):
+    '''
+    returns a dictionary of the volume passed in a specific region of a 
+    specific cross-section.
+    requires:
+    df: a Hydrus dataframe
+    crosses: The location of the cross section at `section` 'x' for example
+    region_length: the height of the region
+    region_location: the end/start position of the region
+    location_is_start=False,  #the region_location =  region_end
+    section='x': the cross section axis
+    grid=0.5: the grid of the dataframe
+    absolute_velocities=True: if True: the direction of the velocity is neglected.
+    
+    '''
+    time_steps = get_available_timesteps(df)
+    section = section
+    # crosses = 50.
+    v_mask_cordinates = {
+        0: 'Moisture',
+        1: 'Head',
+        2.1: 'Vx',
+        2.2: 'Vy',
+        2.3: 'Vz'
+    }
+    plot_title=''
+#     plot_title=f"A {crosses} cm {v_mask_cordinates[var]} cross-section "\
+#                 f"in {section} direction at {time_step} minute"
+    grid = grid
+    time_storage = {}
+    velocity={'x': 2.1, 'y': 2.2, 'z': 2.3}[section.lower()]
+    variables = [0, velocity]
+    for time_step in time_steps:
+        storage = {}
+        for var in variables:  #[0, 1, 2.1, 2.2, 2.3]:
+            storage[var] = draw_full_contour(
+                df,
+                variable=var,
+                time_step=time_step,
+                grid=grid,
+                crosses=crosses,
+                tol=10.,
+                section=section,
+                levels=None,
+                plot_title=plot_title,
+                return_arrays=True,
+                x_step=None,
+                z_step=None,
+                mirror_x=False,
+                mirror_z=False,
+                is2d=False,
+                output_the_contour=False,
+                is_axisymmetric=False,
+                return_figure_object=False)
+
+        # Moisture values
+        Y, Z, M, Lm = storage[0]
+        # Velocity in X direction values
+        _, _, Vx, Lv = storage[velocity]  # to get storage[2.1 if 'x']
+
+        # section = 'x'  # Commented not to make conflict by the above variables
+        y_length = get_full_dimensions(df)[{
+            'x': 'y',
+            'y': 'x',
+            'z': 'y'
+        }[section.lower()]]  # to get_full_dimensions(df)['y'] if 'x'
+
+        y_grids = Y.shape[0] - 1
+
+        if location_is_start:
+            region_start = region_location
+            region_end = region_start + region_length
+        else:
+            region_end = region_location
+            region_start = region_end - region_length
+
+
+#         ng = int(dregion_length / grid) + 1  # Number of grid points
+        grd_s, grd_e = int(region_start / grid), int(region_end / grid + 1)
+
+        # The cropped arrays
+        Mc, Vc = M[grd_s:grd_e, :], Vx[grd_s:grd_e, :]
+
+        # The product
+        MVc = Mc * Vc
+
+        # Area of the drain = 2*20 = 40 cm squared
+        A = region_length * (y_length[1] - y_length[0])
+
+        # The drainage volume =
+        if absolute_velocities:
+            vol = A * np.nanmean(np.abs(MVc))
+        else:
+            vol = A * p.nanmean(MVc)
+
+        time_storage[time_step] = vol
+        
+    return time_storage

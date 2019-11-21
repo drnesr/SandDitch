@@ -3734,10 +3734,13 @@ def get_window_time_volumes(
         location_is_start=False,  #the region_location =  region_end
         section='x',
         grid=0.5,
-        absolute_velocities=True):
+        absolute_velocities=False,
+        filter_negatives=True,
+        return_dictionary=True
+        ):
     '''
-    returns a dictionary of the volume passed in a specific region of a 
-    specific cross-section.
+    returns a numpy array or a dictionary of the volume passed in a 
+    specific region of a specific cross-section.
     requires:
     df: a Hydrus dataframe
     crosses: The location of the cross section at `section` 'x' for example
@@ -3746,7 +3749,12 @@ def get_window_time_volumes(
     location_is_start=False,  #the region_location =  region_end
     section='x': the cross section axis
     grid=0.5: the grid of the dataframe
-    absolute_velocities=True: if True: the direction of the velocity is neglected.
+    absolute_velocities=False: if True: the direction of the velocity is neglected.
+    filter_negatives=True: if True: the negative values will be removed, they will
+        not been converted to zeros nor to their absolute balue, but totally
+        removed, in order not to be calculated in the mean function.
+    return_dictionary=True: If True it returnas a dictionary, (Default)
+                             If False, it returns a numpy array
     
     '''
     time_steps = get_available_timesteps(df)
@@ -3759,12 +3767,12 @@ def get_window_time_volumes(
         2.2: 'Vy',
         2.3: 'Vz'
     }
-    plot_title = ''
-    #     plot_title=f"A {crosses} cm {v_mask_cordinates[var]} cross-section "\
-    #                 f"in {section} direction at {time_step} minute"
+    plot_title=''
+#     plot_title=f"A {crosses} cm {v_mask_cordinates[var]} cross-section "\
+#                 f"in {section} direction at {time_step} minute"
     grid = grid
     time_storage = {}
-    velocity = {'x': 2.1, 'y': 2.2, 'z': 2.3}[section.lower()]
+    velocity={'x': 2.1, 'y': 2.2, 'z': 2.3}[section.lower()]
     variables = [0, velocity]
     for time_step in time_steps:
         storage = {}
@@ -3827,11 +3835,23 @@ def get_window_time_volumes(
         if absolute_velocities:
             vol = A * np.nanmean(np.abs(MVc))
         else:
-            vol = A * p.nanmean(MVc)
+            if filter_negatives:
+                # filter only negatives, but zeros are OK
+                MVc_positives = MVc[MVc>=0]
+                if MVc_positives.shape[0]>0:
+                    vol = A * np.nanmean(MVc_positives)
+                else:
+                    vol = 0
+            else:
+                vol = A * np.nanmean(MVc)
 
         time_storage[time_step] = vol
-
-    return time_storage
+    
+        
+    if return_dictionary:
+        return time_storage
+    else:
+        return np.array([(t, v) for t, v in time_storage.items()])
 
 
 def get_parabola_area(y0, y1, y2, h, k):

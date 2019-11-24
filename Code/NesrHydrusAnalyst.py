@@ -707,12 +707,17 @@ def read_selector_in(file_path, geom='2D'):
 
     # Getting data from the Run_Inf.out file
     filename = os.path.join(file_path, 'Run_Inf.out')
+    # We want only the first and last entries of the table.
+    
+    # Here is the first entry
     headers += ['TLevel_i', 'Time_i', 'dt_i', 'Iter_i', 'ItCum_i']
     body += get_line(5)
     i = 6
+    # Bypassing the other rows
     while get_word(i) != 'end':
         i += 1
     #         print(i, get_word(i), end='||')
+    # Here is the last entry
     headers += ['TLevel_e', 'Time_e', 'dt_e', 'Iter_e', 'ItCum_e']
     body += get_line(i - 1)
 

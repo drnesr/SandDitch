@@ -518,6 +518,11 @@ def retrieve_all_csv_files(source_folder,
 
 
 def read_a_level_out(file_path, geom='2D'):
+    '''
+    Reading two files: `A_Level.out` and `ATMOSPH.IN`
+    Returns a dataframe table of their info
+    '''
+    
     if geom.lower() == '2d':
         start = 3
     else:
@@ -544,6 +549,11 @@ def read_a_level_out(file_path, geom='2D'):
 
 
 def read_balance_out(file_path):
+    '''
+    Reading of one file: `Balance.out`
+    Returns a 1. the total computing time of the simulation AND
+              2. A dataframe table of water balance info
+    '''
     filename = os.path.join(file_path, 'Balance.out')
     headers = [
         'Time', 'Volume', 'VolumeW', 'InFlow', 'hMean', 'WatBalT', 'WatBalR'
@@ -591,6 +601,11 @@ def read_balance_out(file_path):
 
 
 def read_selector_in(file_path, geom='2D'):
+    '''
+    Reading four files: `SELECTOR.IN`, `DIMENSIO.IN`, `Run_Inf.out`, `Balance.out`
+    Returns a dataframe table of a summary of all infos in them
+    '''
+    
     if geom.lower() == '2d':
         is2d = True
         start = 3
@@ -731,6 +746,12 @@ def read_selector_in(file_path, geom='2D'):
 
 
 def get_one_line_df(folder_path, simulation_name="Nesr simulation", dims='2d'):
+    
+    '''
+    Combines the most important info from the following files into one dataframe:
+        `SELECTOR.IN`, `DIMENSIO.IN`, `Run_Inf.out`, `Balance.out`, `A_Level.out` and `ATMOSPH.IN`
+    
+    '''
     # Get the basic parameters
     df_basic = read_selector_in(folder_path, dims)
 
@@ -3872,7 +3893,7 @@ def get_parabola_area(y0, y1, y2, h, k):
     return a / 3 * (k**3 + h**3) + b / 2 * (k * k - h * h) + y1 * (k + h)
 
 
-def get_uneven_spans_area(data, show_steps=False):
+def get_uneven_spans_area(data_, show_steps=False):
     """
     Calculates the area of a shape based on approximate parabolas
     Similar to simpson's rule but with un-even spans
@@ -3883,6 +3904,13 @@ def get_uneven_spans_area(data, show_steps=False):
     
     Note: n must be odd and >=3
     """
+    # Check the type of the data iterable
+    # and convert to numpy array if it is a dictionary
+    if type(data_)==dict:
+        data =  np.array([(t, v) for t, v in data_.items()])
+    else:
+        data = data_
+        
     area = 0
     # n must be of odd number and >= 3
     n = data.shape[0]

@@ -4054,3 +4054,28 @@ def get_means_table(filename,
 
     body = np.array(body)
     return pd.DataFrame(body, columns=headers)
+
+
+def get_mean_outs_table(file_path):
+    '''
+    Returns a dataframe of the data in four files:
+    'Cum_Q.out', 'h_Mean.out', 'v_Mean.out', 'Run_inf.out'
+    The input is the path of the HYDRUS working folder that contains the files
+    '''
+    tables=[]
+    tables.append(get_means_table(os.path.join(file_path, 'Cum_Q.out'), 11, 14, 12))
+    tables.append(get_means_table(os.path.join(file_path, 'h_Mean.out'), 4, 7, 5))
+    tables.append(get_means_table(os.path.join(file_path, 'v_Mean.out'), 11, 14, 12))
+    merged = pd.merge(tables[0], tables[1], on='Time_T')
+    
+    # The final combined table of means
+    merged = pd.merge(merged, tables[2], on='Time_T')
+    tables=None
+    # Runtime info table
+    rnf = get_means_table(os.path.join(file_path, 'Run_inf.out'), 3, 5, None)
+    # Convert all into numeric
+    rnf = rnf.apply(pd.to_numeric, errors='coerce')
+    merged = merged.apply(pd.to_numeric, errors='coerce')
+    merged = pd.concat([merged, rnf], sort=False, axis=1)
+    merged.drop(['TLevel', 'Time'], axis=1, inplace=True)
+    return merged

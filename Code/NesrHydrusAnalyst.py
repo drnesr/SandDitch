@@ -3935,3 +3935,122 @@ def get_uneven_spans_area(data_, show_steps=False):
         if show_steps:
             print(i, ": ", x0, y0, x1, y1, x2, y2, h, k, part_area)
     return area
+
+def get_means_table(filename,
+                    header_location,
+                    data_location,
+                    units_location=None):
+    '''
+    Returns a table of adjusted data to numeric analysis
+    
+    We have to specify the:
+    header_location: the line number that contains the headers, 
+    units_location : the line number that contains the units (if None, then
+                        no units is allowed), 
+    data_location  : the line number that contains the first line of data.
+    
+    Units will be written after an underscore without any special chars
+    e.g. velocity: m/s  --> velocity_mps
+    
+    # filename = os.path.join(file_path, 'Cum_Q.out')
+    '''
+
+    # Defining some functions
+    def proper_type(x):
+        try:
+            nf = float(x)
+            ni = float(int(nf))
+            # print(nf, ni, abs(nf - ni))
+            if abs(nf - ni) < 0.0000000000001:
+                return int(ni)
+            else:
+                return nf
+        except:
+            return x
+
+    def replace_text(x):
+        if x in ('t', 'f'):
+            # return {'t':1, 'f':0}[x]
+            return ['f', 't'].index(x)
+        elif x in ('mm', 'cm', 'm'):
+            return ['mm', 'cm', 'm'].index(x)
+        elif x in ('sec', 'min', 'hours', 'days', 'years'):
+            return ['sec', 'min', 'hours', 'days', 'years'].index(x)
+        elif x in ('s', 'min', 'h', 'd', 'y'):
+            return ['s', 'min', 'h', 'd', 'y'].index(x)
+        else:
+            return x  # proper_type(x)
+
+    def get_line(filename, pos):
+        line_feed = linecache.getline(filename, pos).split()
+        return list(map(replace_text, line_feed))
+
+    def get_word(filename, pos, loc=0):
+        word = get_line(pos)
+        if len(word) < 1:
+            return ''
+        else:
+            word = word[loc]
+        if isinstance(word, str):
+            return word.strip()
+        else:
+            return word
+
+    def get_num(p1, p2, is2d):
+        '''
+        p1, the line of 2D file
+        p2, the line of 3D file
+        '''
+        return {True: p1, False: p2}[is2d]
+
+    def adjust_body(replaceable, headers, body):
+        for _ in range(len(headers) - len(body)):
+            body.append(replaceable)
+
+    def reform_unit(unit, prefix=None):
+        '''
+        Functions to add units
+
+        '''
+
+        def split_letters(word):
+            return [_ for _ in word]
+
+        reformed = ''.join([{
+            '/': 'p',
+            '.': '',
+            '[': '',
+            ']': ''
+        }.get(i, i) for i in split_letters(unit)])
+        if prefix is None:
+            return reformed
+        else:
+            return prefix + reformed
+
+    # Defining variables
+    headers = []
+    body = []
+    headers += get_line(filename, header_location)
+    try:
+        # If there is any empty columns, remove them
+        for _ in range(5):
+            headers.remove('...')
+    except:
+        pass
+    headers = [_.replace('...', '') for _ in headers]
+
+    if units_location is not None:
+        units = get_line(filename, units_location)
+        units = [reform_unit(_, '_') for _ in units]
+        headers = [x + y for x, y in zip(headers, units)]
+
+    # reading to the end of the file
+    i = data_location
+    feed = get_line(filename, i)
+    while feed[0] != 'end':
+        body.append(feed)
+        i += 1
+        feed = get_line(filename, i)
+
+    body = np.array(body)
+    return pd.DataFrame(body, columns=headers)

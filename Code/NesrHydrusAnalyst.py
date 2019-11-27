@@ -3939,7 +3939,9 @@ def get_uneven_spans_area(data_, show_steps=False):
 def get_means_table(filename,
                     header_location,
                     data_location,
-                    units_location=None):
+                    units_location=None,
+                    reading_end='end', 
+                    replace_units=True):
     '''
     Returns a table of adjusted data to numeric analysis
     
@@ -3948,6 +3950,18 @@ def get_means_table(filename,
     units_location : the line number that contains the units (if None, then
                         no units is allowed), 
     data_location  : the line number that contains the first line of data.
+    
+    if reading_end='end', it reads the lines until it finds the word 'end'
+        (or any other word) at the beginining of the last line (it will 
+        read before the 'end')
+    if reading_end=integer, then it will read until it reaches the specified 
+        number (inclusive)
+    if replace_units=True, it will replace the units by equivalent numbers
+        according to the following:
+        'f', 't' >> 0, 1
+        'mm', 'cm', 'm' >> 0, 1, 2
+        'sec', 'min', 'hours', 'days', 'years' >> 0, 1, 2, 3, 4
+        's', 'min', 'h', 'd', 'y' >>  0, 1, 2, 3, 4
     
     Units will be written after an underscore without any special chars
     e.g. velocity: m/s  --> velocity_mps
@@ -3981,9 +3995,12 @@ def get_means_table(filename,
         else:
             return x  # proper_type(x)
 
-    def get_line(filename, pos):
+    def get_line(filename, pos, replace_units=True):
         line_feed = linecache.getline(filename, pos).split()
-        return list(map(replace_text, line_feed))
+        if replace_units:
+            return list(map(replace_text, line_feed))
+        else:
+            return line_feed
 
     def get_word(filename, pos, loc=0):
         word = get_line(pos)
@@ -4030,7 +4047,7 @@ def get_means_table(filename,
     # Defining variables
     headers = []
     body = []
-    headers += get_line(filename, header_location)
+    headers += get_line(filename, header_location, False)
     try:
         # If there is any empty columns, remove them
         for _ in range(5):
@@ -4040,17 +4057,21 @@ def get_means_table(filename,
     headers = [_.replace('...', '') for _ in headers]
 
     if units_location is not None:
-        units = get_line(filename, units_location)
+        units = get_line(filename, units_location, replace_units)
         units = [reform_unit(_, '_') for _ in units]
         headers = [x + y for x, y in zip(headers, units)]
-
-    # reading to the end of the file
-    i = data_location
-    feed = get_line(filename, i)
-    while feed[0] != 'end':
-        body.append(feed)
-        i += 1
-        feed = get_line(filename, i)
+    
+    if type(reading_end)==str: # 'end' for example
+        # reading to the end of the file
+        i = data_location
+        feed = get_line(filename, i, replace_units)
+        while feed[0] != reading_end:
+            body.append(feed)
+            i += 1
+            feed = get_line(filename, i, replace_units)
+    else:
+        for i in range (data_location, int(reading_end) + 1):
+            body.append(get_line(filename, i, replace_units))
 
     body = np.array(body)
     return pd.DataFrame(body, columns=headers)

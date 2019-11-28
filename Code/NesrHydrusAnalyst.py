@@ -3985,7 +3985,7 @@ def get_means_table(filename,
                     data_location,
                     units_location=None,
                     reading_end='end', 
-                    replace_units=True):
+                    replace_units=False):
     '''
     Returns a table of adjusted data to numeric analysis
     
@@ -4101,24 +4101,33 @@ def get_mean_outs_table(file_path):
     merged.drop(['TLevel', 'Time'], axis=1, inplace=True)
     return merged
 
-def save_this(dataframe, data_folder, output_name, authorized=True):
+def save_this(dataframe,
+              data_folder,
+              output_name,
+              authorized=True,
+              save_type='csv',
+              save_index=False):
     """
-    if the `authorized` flag is true, the `dataframe` will be saved as CSV 
-        file, in the location `data_folder`//Nesr with the name `output_name`
+    if the `authorized` flag is true, the `dataframe` will be saved as 
+        CSV or json files (depending on the `save_type`), 
+        in the location `data_folder`//Nesr with the name `output_name`
     """
 
-    
     if authorized:
         # check for the output folder
         save_folder = os.path.join(data_folder, 'Nesr')
         if not os.path.exists(save_folder):
-            os.makedirs(save_folder) 
+            os.makedirs(save_folder)
         # Saving
         filename = output_name
-        if filename[-4:].lower() != '.csv':
-            filename = f'{filename}.CSV'
-        dataframe.to_csv(
-            os.path.join(save_folder, filename), index=False)
+        if filename[-3:].lower() != save_type.lower():
+            filename = f'{filename}.{save_type.lower()}'
+        if save_type.lower() == 'csv':
+            dataframe.to_csv(
+                os.path.join(save_folder, filename), index=save_index)
+        elif save_type.lower() == 'json':
+            dataframe.to_json(os.path.join(save_folder, filename))
+            
         
 def read_boundary_data(folder='Current',
                        titles_loc=19,

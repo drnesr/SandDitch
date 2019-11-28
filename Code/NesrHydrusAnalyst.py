@@ -738,8 +738,9 @@ def read_selector_in(file_path, geom='2D'):
 
     df = pd.DataFrame(data=body, index=headers).T
     df = df.apply(pd.to_numeric, errors='ignore')
-    return df
-    pass
+    # To remove duplicates
+    df3 = (df.T.loc[~df.T.index.duplicated(keep='first')]).T
+    return df3
 
 
 # res=read_selector_in(source, '2d')

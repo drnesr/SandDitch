@@ -4100,3 +4100,119 @@ def get_mean_outs_table(file_path):
     merged = pd.concat([merged, rnf], sort=False, axis=1)
     merged.drop(['TLevel', 'Time'], axis=1, inplace=True)
     return merged
+
+def save_this(dataframe, data_folder, output_name, authorized=True):
+    """
+    if the `authorized` flag is true, the `dataframe` will be saved as CSV 
+        file, in the location `data_folder`//Nesr with the name `output_name`
+    """
+
+    
+    if authorized:
+        # check for the output folder
+        save_folder = os.path.join(data_folder, 'Nesr')
+        if not os.path.exists(save_folder):
+            os.makedirs(save_folder) 
+        # Saving
+        filename = output_name
+        if filename[-4:].lower() != '.csv':
+            filename = f'{filename}.CSV'
+        dataframe.to_csv(
+            os.path.join(save_folder, filename), index=False)
+        
+def read_boundary_data(folder='Current',
+                       titles_loc=19,
+                       data_begins=22,
+                       nums_per_line=10,
+                       save_to_csv=True):
+    '''
+    A function to read both BOUNDARY.IN and  Boundary.outfiles from HYDRUS 
+        outputs, then to:
+            1- return one dataframe contains both data in a decent format.
+            2- save this output to a CSV file (optional, True by default)
+    Input:
+        The name of the main folder (leave balank for the current folder)
+        titles_loc=19, the line number of the first line contains captions
+        data_begins=22, the line number of the first line contains data
+        nums_per_line=10, teh number of columns per line in BOUNDARY.IN file
+        The option to save_to csv, default =True (Boolean)
+    '''
+
+    # Specify the source folder
+    if folder == 'Current':
+        read_dir = os.getcwd()
+    else:
+        read_dir = folder
+
+    # Finding number of nodes in the file
+    mesh_file = os.path.join(read_dir, 'BOUNDARY.IN')
+    num_cells = int(linecache.getline(mesh_file, 4).split()[0])
+    # Define dataframe titles
+    titles = ['n', 'surface_area']
+
+    def get_num_lines(num_cells, nums_per_line=10):
+        num_lines = int(num_cells / nums_per_line)
+        if num_cells % nums_per_line > 0: num_lines += 1
+        return num_lines
+
+    def read_snakey_list(file_name, start_line, end_line, data_type=float):
+        '''
+        Reading a list of numbers thar are stored in a text file, where
+        there are `numbers_count` numbers, stored as `nums_per_line` numbers 
+        per line, the starting position of first occurence of numbers is at
+        `start_line` line number
+        returns a numpy array of the data with the `data_type` given
+        '''
+        points = []
+        for i in range(start_line, end_line):
+            points.extend(linecache.getline(file_name, i).split())
+        return np.array(points, data_type)
+
+    num_lines = get_num_lines(num_cells, nums_per_line)
+
+    first_line = 10
+    end_line = first_line + num_lines
+    points = read_snakey_list(mesh_file, first_line, end_line, data_type=int)
+
+    first_line = end_line + 1
+    end_line = first_line + num_lines
+    areas = read_snakey_list(mesh_file, first_line, end_line)
+    data = np.array([points, areas]).T
+    data_in = pd.DataFrame(
+        data, columns=titles).astype({
+            "n": int,
+            "surface_area": float
+        })
+
+    # Adding the surface area to the above table
+    # print(num_cells, nums_per_line, num_lines)
+    frames = []
+    for t in get_available_timesteps(df)[1:]:
+        data_ends = data_begins + num_cells - 1
+        # print(titles_loc, data_begins, num_lines, data_ends)
+        dft = get_means_table(
+            os.path.join(src, 'Boundary.out'),
+            titles_loc,
+            data_begins,
+            units_location=None,
+            reading_end=data_ends,
+            replace_units=False)  #.sample(3)
+        # add a column for time
+        dft = dft.assign(time_step=t)
+        # convert all columns to numeric
+        cols = list(dft)
+        # print(cols)
+        # display(dft)
+        dft[cols] = dft[cols].apply(pd.to_numeric, errors='coerce')
+        dft = pd.merge(dft, data_in, on='n')
+        frames.append(dft)
+        titles_loc = data_ends + 5
+        data_begins = titles_loc + 3
+    # display(frames)
+    frames = pd.concat(frames, ignore_index=True)
+    
+    # Saving if allowed
+    # save_this(dataframe, data_folder, output_name, authorized=True)
+    save_this(frames, src, 'boundary_data.CSV', authorized=save_to_csv)
+    
+    return frames        

@@ -690,14 +690,17 @@ def read_selector_in(file_path, geom='2D'):
 
     headers += get_line(get_num(22, 20))
     body += get_line(get_num(23, 21))
+    
+    # The location of dt, dMin, ... depends on the number of materials
+    num_material = proper_type(body[-2])
 
     headers += get_line(get_num(24, 22))
     body += get_line(get_num(25, 23))
 
-    headers += get_line(27)
-    body += get_line(28)
-    headers += get_line(29)
-    body += get_line(30)
+    headers += get_line(27 + num_material - 1)
+    body += get_line(28 + num_material - 1)
+    headers += get_line(29 + num_material - 1)
+    body += get_line(30 + num_material - 1)
 
     # Getting data from the DIMENSIO.IN file
     filename = os.path.join(file_path, 'DIMENSIO.IN')

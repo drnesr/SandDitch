@@ -3936,6 +3936,50 @@ def get_uneven_spans_area(data_, show_steps=False):
             print(i, ": ", x0, y0, x1, y1, x2, y2, h, k, part_area)
     return area
 
+# Defining some functions
+def proper_type(x):
+    try:
+        nf = float(x)
+        ni = float(int(nf))
+        # print(nf, ni, abs(nf - ni))
+        if abs(nf - ni) < 0.0000000000001:
+            return int(ni)
+        else:
+            return nf
+    except:
+        return x
+
+def replace_text(x):
+    if x in ('t', 'f'):
+        # return {'t':1, 'f':0}[x]
+        return ['f', 't'].index(x)
+    elif x in ('mm', 'cm', 'm'):
+        return ['mm', 'cm', 'm'].index(x)
+    elif x in ('sec', 'min', 'hours', 'days', 'years'):
+        return ['sec', 'min', 'hours', 'days', 'years'].index(x)
+    elif x in ('s', 'min', 'h', 'd', 'y'):
+        return ['s', 'min', 'h', 'd', 'y'].index(x)
+    else:
+        return x  # proper_type(x)
+
+def get_line(filename, pos, replace_units=True):
+    line_feed = linecache.getline(filename, pos).split()
+    if replace_units:
+        return list(map(replace_text, line_feed))
+    else:
+        return line_feed
+
+def get_word(filename, pos, loc=0):
+    word = get_line(pos)
+    if len(word) < 1:
+        return ''
+    else:
+        word = word[loc]
+    if isinstance(word, str):
+        return word.strip()
+    else:
+        return word
+        
 def get_means_table(filename,
                     header_location,
                     data_location,
@@ -3968,50 +4012,6 @@ def get_means_table(filename,
     
     # filename = os.path.join(file_path, 'Cum_Q.out')
     '''
-
-    # Defining some functions
-    def proper_type(x):
-        try:
-            nf = float(x)
-            ni = float(int(nf))
-            # print(nf, ni, abs(nf - ni))
-            if abs(nf - ni) < 0.0000000000001:
-                return int(ni)
-            else:
-                return nf
-        except:
-            return x
-
-    def replace_text(x):
-        if x in ('t', 'f'):
-            # return {'t':1, 'f':0}[x]
-            return ['f', 't'].index(x)
-        elif x in ('mm', 'cm', 'm'):
-            return ['mm', 'cm', 'm'].index(x)
-        elif x in ('sec', 'min', 'hours', 'days', 'years'):
-            return ['sec', 'min', 'hours', 'days', 'years'].index(x)
-        elif x in ('s', 'min', 'h', 'd', 'y'):
-            return ['s', 'min', 'h', 'd', 'y'].index(x)
-        else:
-            return x  # proper_type(x)
-
-    def get_line(filename, pos, replace_units=True):
-        line_feed = linecache.getline(filename, pos).split()
-        if replace_units:
-            return list(map(replace_text, line_feed))
-        else:
-            return line_feed
-
-    def get_word(filename, pos, loc=0):
-        word = get_line(pos)
-        if len(word) < 1:
-            return ''
-        else:
-            word = word[loc]
-        if isinstance(word, str):
-            return word.strip()
-        else:
-            return word
 
     def get_num(p1, p2, is2d):
         '''

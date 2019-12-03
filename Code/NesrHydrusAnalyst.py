@@ -4252,6 +4252,13 @@ def get_one_line_plus(src):
     `Boundary.out` and `Check.out` files
     returns a single column dataframe
     '''
+    # Step 1: Getting the orignal properties #
+    dfg = get_one_line_df(
+        src, simulation_name="Sand Ditch simulation", dims='3d')
+    # ----------------------------------------------------
+    
+    
+    # Step 2: Getting the 'Boundary.out' properties #
     filename = os.path.join(src, 'Boundary.out')
     to_add = {}
     for i in [12, 13, 14]:
@@ -4272,13 +4279,16 @@ def get_one_line_plus(src):
         del to_add[key]
     # to_add = to_add2
     # Convert the dictionary to a dataframe
-    dfg = get_one_line_df(
-        src, simulation_name="Sand Ditch simulation", dims='3d')
-    # Add the 'Boundary.out' data
+
+    # Add the 'Boundary.out' data to the original file
     dfg = dfg.append(
         pd.DataFrame.from_dict(to_add, orient='index', columns=dfg.columns))
-    # dfg
-
+    # ----------------------------------------------------
+    
+    
+    # Step 3: Getting the 'Check.out' properties #
+    # Reading the material 'Check.out' file:
+    material = os.path.join(read_dir, 'Check.out')    
     material_line = search_for('MatNum,', material, 1) + 2
     material_header = get_line(material, material_line, False)
     # Get the material table's info

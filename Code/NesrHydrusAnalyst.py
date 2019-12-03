@@ -4320,14 +4320,14 @@ def save_all_simulation_info(src,
     Grabs all the fragment info about the simulation from different files, 
     then save it to the subfolder Nesr in the same source `src` with the
     saving name `saving_name` and extension `save_type` 
-    (allowed types:csv, json)
+    (allowed types:csv, json).
     returns None
     """
     info_df = get_one_line_plus(src)
     save_this(
         info_df,
         src,
-        'Simulation_info',
+        saving_name,
         authorized=True,
         save_type='csv',
         save_index=True)

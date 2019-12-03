@@ -4228,3 +4228,98 @@ def read_boundary_data(folder='Current',
     save_this(frames, src, 'boundary_data.CSV', authorized=save_to_csv)
     
     return frames        
+
+def search_for(search_word, file_name, start_line):
+    '''
+    Searches for a specific word `search_word` (as a first word in the line) 
+    in a file with full path `file_name`
+    starting from the line `start_line`
+    returns the line number it is located in
+    '''
+    material_line = start_line
+    first_word = get_line(file_name, material_line, False)[0]
+    while first_word != search_word:
+        material_line += 1
+        try:
+            first_word = get_line(file_name, material_line, False)[0]
+        except:
+            first_word = ''
+    return material_line
+
+def get_one_line_plus(src):
+    '''
+    updates the get_one_line_df function to add info from 
+    `Boundary.out` and `Check.out` files
+    returns a single column dataframe
+    '''
+    filename = os.path.join(src, 'Boundary.out')
+    to_add = {}
+    for i in [12, 13, 14]:
+        l = get_line(filename, i, replace_units=False)
+        caption = ' '.join(l[:-1])
+        data = proper_type(l[-1])
+        to_add[caption] = data
+    # to_add
+    brief_dictionary = {
+        'Variable head or flux 1 boundary:': 'VarFluxArea',
+        'Atmospheric boundary:': 'AtmosArea',
+        'Free or deep drainage boundary:': 'DrainageArea'
+    }
+    # Replace names
+    keys = list(to_add.keys())
+    for key in keys:
+        to_add[brief_dictionary[key]] = to_add[key]
+        del to_add[key]
+    # to_add = to_add2
+    # Convert the dictionary to a dataframe
+    dfg = get_one_line_df(
+        src, simulation_name="Sand Ditch simulation", dims='3d')
+    # Add the 'Boundary.out' data
+    dfg = dfg.append(
+        pd.DataFrame.from_dict(to_add, orient='index', columns=dfg.columns))
+    # dfg
+
+    material_line = search_for('MatNum,', material, 1) + 2
+    material_header = get_line(material, material_line, False)
+    # Get the material table's info
+    material_start = material_line + 2
+    material_end = search_for('Table', material, 1) - 2
+    materials_count = material_end - material_start + 1
+    material_table = []
+    for line in range(material_start, material_end + 1):
+        material_table.append(get_line(material, line, False))
+    material_header = material_header[:len(material_table[0])]
+    material_df = pd.DataFrame(
+        material_table, columns=material_header).apply(pd.to_numeric)
+    mat_dict = {}
+    for prop in material_header[1:]:
+        for mat in range(materials_count):
+            prop2 = prop.replace('Q', 'Theta_').replace('_r', 'R').replace(
+                '_s', 'S')
+            prop2 = f'{prop2}_{mat+1}'.replace('l_', 'Lambda_')
+            mat_dict[prop2] = material_df.loc[mat, prop]
+    # Add the 'Check.out' data
+    dfg = dfg.append(
+        pd.DataFrame.from_dict(mat_dict, orient='index', columns=dfg.columns))
+    return dfg
+
+def save_all_simulation_info(src,
+                             saving_name='Simulation_info',
+                             save_type='csv'):
+    """ 
+    Grabs all the fragment info about the simulation from different files, 
+    then save it to the subfolder Nesr in the same source `src` with the
+    saving name `saving_name` and extension `save_type` 
+    (allowed types:csv, json)
+    returns None
+    """
+    info_df = get_one_line_plus(src)
+    save_this(
+        info_df,
+        src,
+        'Simulation_info',
+        authorized=True,
+        save_type='csv',
+        save_index=True)
+    print('**SAVED**')
+    print(f'path: {src}/Nesr/{saving_name}.{save_type}')

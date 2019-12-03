@@ -4333,3 +4333,51 @@ def save_all_simulation_info(src,
         save_index=True)
     print('**SAVED**')
     print(f'path: {src}/Nesr/{saving_name}.{save_type}')
+    
+def get_materials_properties(read_dir):
+    '''
+    Reading the file `Check.out` to find the detailed materials properties
+    Returns a dataframe for all the used materials
+    '''
+    material = os.path.join(read_dir, 'Check.out')
+    material_line = search_for('MatNum,', material, 1) + 2
+    material_header = get_line(material, material_line, False)
+    # Get the material table's info
+    material_start = material_line + 2
+    material_end = search_for('Table', material, 1) - 2
+    materials_count = material_end - material_start + 1
+    prop_start = material_end + 5
+    prop_header = get_line(material, prop_start, False)
+
+    # read the head of the properties table
+    head = [prop_header[0]]
+    i = 1
+    while i < len(prop_header):
+        if prop_header[i] != 'log':
+            head.append(prop_header[i])
+            i += 1
+        else:
+            head.append(f'log_{prop_header[i+1]}')
+            i += 2
+
+    # Get the end of the property
+    start = prop_start
+
+    prop_df = None
+    for mtr in range(materials_count):
+        # Get the end of the property
+        prop_end = search_for('end', material, start)
+        prop_data = []
+        for l in range(start + 2, prop_end):
+            prop_data.append(get_line(material, l, False))
+        prop_data = pd.DataFrame(prop_data, columns=head).apply(pd.to_numeric)
+        prop_data['Material'] = mtr + 1
+        start = prop_end + 2
+        if prop_df is None:
+            prop_df = prop_data.copy()
+        else:
+            prop_df = pd.concat([prop_df, prop_data], axis=0, ignore_index=True)
+    cols = list(prop_df)
+    cols = [cols[-1]]+cols[:-1]
+    prop_df = prop_df[cols]
+    return prop_df

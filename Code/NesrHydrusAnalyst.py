@@ -605,7 +605,7 @@ def read_selector_in(file_path, geom='2D'):
     Reading four files: `SELECTOR.IN`, `DIMENSIO.IN`, `Run_Inf.out`, `Balance.out`
     Returns a dataframe table of a summary of all infos in them
     '''
-    
+
     if geom.lower() == '2d':
         is2d = True
         start = 3
@@ -647,12 +647,12 @@ def read_selector_in(file_path, geom='2D'):
         else:
             return x  # proper_type(x)
 
-    def get_line(pos):
+    def get_crnt_file_line(pos):
         line_feed = linecache.getline(filename, pos).split()
         return list(map(replace_text, line_feed))
 
-    def get_word(pos, loc=0):
-        word = get_line(pos)
+    def get_cur_file_word(pos, loc=0):
+        word = get_crnt_file_line(pos)
         if len(word) < 1:
             return ''
         else:
@@ -673,64 +673,64 @@ def read_selector_in(file_path, geom='2D'):
         for _ in range(len(headers) - len(body)):
             body.append(replaceable)
 
-    body.append(get_word(6))
-    body.append(get_word(7))
-    body.append({True: int(get_word(10)), False: 3}[is2d])
-    headers += get_line(get_num(11, 9))[:4]
-    body += get_line(get_num(12, 10))[:4]
+    body.append(get_cur_file_word(6))
+    body.append(get_cur_file_word(7))
+    body.append({True: int(get_cur_file_word(10)), False: 3}[is2d])
+    headers += get_crnt_file_line(get_num(11, 9))[:4]
+    body += get_crnt_file_line(get_num(12, 10))[:4]
 
-    headers += get_line(get_num(13, 11))
-    body += get_line(get_num(14, 12))
-    headers += get_line(get_num(15, 13))
-    body += get_line(get_num(16, 14))
+    headers += get_crnt_file_line(get_num(13, 11))
+    body += get_crnt_file_line(get_num(14, 12))
+    headers += get_crnt_file_line(get_num(15, 13))
+    body += get_crnt_file_line(get_num(16, 14))
 
-    headers += get_line(get_num(20, 18))
-    body += get_line(get_num(21, 19))
+    headers += get_crnt_file_line(get_num(20, 18))
+    body += get_crnt_file_line(get_num(21, 19))
     adjust_body(0)
 
-    headers += get_line(get_num(22, 20))
-    body += get_line(get_num(23, 21))
-    
+    headers += get_crnt_file_line(get_num(22, 20))
+    body += get_crnt_file_line(get_num(23, 21))
+
     # The location of dt, dMin, ... depends on the number of materials
     num_material = proper_type(body[-2])
 
-    headers += get_line(get_num(24, 22))
-    body += get_line(get_num(25, 23))
+    headers += get_crnt_file_line(get_num(24, 22))
+    body += get_crnt_file_line(get_num(25, 23))
 
-    headers += get_line(27 + num_material - 1)
-    body += get_line(28 + num_material - 1)
-    headers += get_line(29 + num_material - 1)
-    body += get_line(30 + num_material - 1)
+    headers += get_crnt_file_line(27 + num_material - 1)
+    body += get_crnt_file_line(28 + num_material - 1)
+    headers += get_crnt_file_line(29 + num_material - 1)
+    body += get_crnt_file_line(30 + num_material - 1)
 
     # Getting data from the DIMENSIO.IN file
     filename = os.path.join(file_path, 'DIMENSIO.IN')
-    headers += get_line(2)
-    body += get_line(3)
+    headers += get_crnt_file_line(2)
+    body += get_crnt_file_line(3)
     adjust_body(0)
 
     # Getting data from the Run_Inf.out file
     filename = os.path.join(file_path, 'Run_Inf.out')
     # We want only the first and last entries of the table.
-    
+
     # Here is the first entry
     headers += ['TLevel_i', 'Time_i', 'dt_i', 'Iter_i', 'ItCum_i']
-    body += get_line(5)
+    body += get_crnt_file_line(5)
     i = 6
     # Bypassing the other rows
-    while get_word(i) != 'end':
+    while get_cur_file_word(i) != 'end':
         i += 1
     #         print(i, get_word(i), end='||')
     # Here is the last entry
     headers += ['TLevel_e', 'Time_e', 'dt_e', 'Iter_e', 'ItCum_e']
-    body += get_line(i - 1)
+    body += get_crnt_file_line(i - 1)
 
     # Getting data from the Balance.out file
     filename = os.path.join(file_path, 'Balance.out')
     headers = ['SimulTime_s'] + headers
     i = 10
-    while get_word(i) != 'Calculation':
+    while get_cur_file_word(i) != 'Calculation':
         i += 1
-    body = [get_word(i, loc=3)] + body
+    body = [get_cur_file_word(i, loc=3)] + body
 
     # finalize
     body = np.array(body)
@@ -741,7 +741,6 @@ def read_selector_in(file_path, geom='2D'):
     # To remove duplicates
     df3 = (df.T.loc[~df.T.index.duplicated(keep='first')]).T
     return df3
-
 
 # res=read_selector_in(source, '2d')
 # # res.astype(float)
@@ -3974,7 +3973,7 @@ def get_line(filename, pos, replace_units=True):
         return line_feed
 
 def get_word(filename, pos, loc=0):
-    word = get_line(pos)
+    word = get_line(filename, pos)
     if len(word) < 1:
         return ''
     else:

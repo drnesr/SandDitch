@@ -4381,3 +4381,22 @@ def get_materials_properties(read_dir):
     cols = [cols[-1]]+cols[:-1]
     prop_df = prop_df[cols]
     return prop_df
+
+
+def save_materials_properties(read_dir, saving_name='Materials_info'):
+    """ 
+    Grabs all the Materials info about the simulation from `CHeck.out` file, 
+    then save it to the subfolder Nesr in the same source `read_dir` with the
+    saving name `saving_name` and extension CSV 
+    returns None
+    """
+    info_df = get_materials_properties(read_dir)
+    save_this(
+        info_df,
+        read_dir,
+        saving_name,
+        authorized=True,
+        save_type='csv',
+        save_index=False)
+    print('**SAVED**')
+    print(f'path: {read_dir}/Nesr/{saving_name}.CSV')

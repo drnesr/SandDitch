@@ -4130,7 +4130,8 @@ def save_this(dataframe,
                 os.path.join(save_folder, filename), index=save_index)
         elif save_type.lower() == 'json':
             dataframe.to_json(os.path.join(save_folder, filename))
-            
+        print('**SAVED**')
+        print(f'path: {save_folder}/{filename}'.replace('\\', '/'))    
         
 def read_boundary_data(folder='Current',
                        titles_loc=19,
@@ -4288,7 +4289,7 @@ def get_one_line_plus(src):
     
     # Step 3: Getting the 'Check.out' properties #
     # Reading the material 'Check.out' file:
-    material = os.path.join(read_dir, 'Check.out')    
+    material = os.path.join(src, 'Check.out')    
     material_line = search_for('MatNum,', material, 1) + 2
     material_header = get_line(material, material_line, False)
     # Get the material table's info
@@ -4331,8 +4332,8 @@ def save_all_simulation_info(src,
         authorized=True,
         save_type='csv',
         save_index=True)
-    print('**SAVED**')
-    print(f'path: {src}/Nesr/{saving_name}.{save_type}')
+    # print('**SAVED**')
+    # print(f'path: {src}/Nesr/{saving_name}.{save_type}')
     
 def get_materials_properties(read_dir):
     '''
@@ -4398,5 +4399,5 @@ def save_materials_properties(read_dir, saving_name='Materials_info'):
         authorized=True,
         save_type='csv',
         save_index=False)
-    print('**SAVED**')
-    print(f'path: {read_dir}/Nesr/{saving_name}.CSV')
+    # print('**SAVED**')
+    # print(f'path: {read_dir}/Nesr/{saving_name}.CSV')

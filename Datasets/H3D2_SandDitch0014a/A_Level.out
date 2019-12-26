@@ -1,0 +1,16 @@
+ Welcome to HYDRUS                                                       
+ 
+ Program HYDRUS3
+ Date:  18.12.2019    Time:   8:33:55
+ Time dependent boundary conditions
+ 
+ Units: L = cm   , T = min  , M = mmol 
+ 
+ All cumulative fluxes (CumQ) are positive out of the region
+
+      Time      CumQAP     CumQRP     CumQA      CumQR      CumQ3        hAtm       hRoot     hKode3    A-level
+      [T]        [L3]       [L3]       [L3]       [L3]        [L3]          [L]        [L]        [L] 
+
+     60.0000  0.000E+00  0.000E+00  0.000E+00  0.000E+00 -0.405E+04        0.6        0.0        9.5       1
+   2880.0000  0.000E+00  0.000E+00  0.000E+00  0.000E+00 -0.405E+04      -39.5        0.0      -39.3       2
+end

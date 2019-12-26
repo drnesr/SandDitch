@@ -692,10 +692,11 @@ def read_selector_in(file_path, geom='2D'):
     body += get_crnt_file_line(get_num(23, 21))
 
     # The location of dt, dMin, ... depends on the number of materials
-    num_material = proper_type(body[-2])
-
-    headers += get_crnt_file_line(get_num(24, 22))
-    body += get_crnt_file_line(get_num(25, 23))
+    num_material = proper_type(body[headers.index('NMat')])
+    materials_header = get_crnt_file_line(get_num(24, 22))
+    for material in range(1, num_material + 1):
+        headers += [f'{x}_Mtr{material}' for x in materials_header]
+        body += get_crnt_file_line(get_num(25, 23+material-1))
 
     headers += get_crnt_file_line(27 + num_material - 1)
     body += get_crnt_file_line(28 + num_material - 1)

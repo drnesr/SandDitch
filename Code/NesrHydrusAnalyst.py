@@ -4130,8 +4130,8 @@ def save_this(dataframe,
                 os.path.join(save_folder, filename), index=save_index)
         elif save_type.lower() == 'json':
             dataframe.to_json(os.path.join(save_folder, filename))
-        print('**SAVED**')
-        print(f'path: {save_folder}/{filename}'.replace('\\', '/'))    
+        #print('**SAVED**')
+        print(f'**SAVED** >> path: {save_folder}/{filename}'.replace('\\', '/'))    
         
 def read_boundary_data(folder='Current',
                        titles_loc=19,
@@ -4401,3 +4401,101 @@ def save_materials_properties(read_dir, saving_name='Materials_info'):
         save_index=False)
     # print('**SAVED**')
     # print(f'path: {read_dir}/Nesr/{saving_name}.CSV')
+    
+    
+def reform_grid(data_frame):
+    '''
+    Convert the read data_frame to a reformed table with columns:
+    [n	x	y	z	Time	H	Th	V1	V2	V3]
+    '''
+    melted = data_frame.melt(
+        id_vars=['n', 'x', 'y', 'z'], var_name='VarTime', value_name='Value')
+    new = melted["VarTime"].str.split("_", n=1, expand=True)
+    # # making separate first name column from new data frame
+    melted["Variable"] = new[0]
+    # # making separate last name column from new data frame
+    melted["Time"] = pd.to_numeric(
+        new[1].map(lambda x: x.lstrip('T')), downcast='integer')
+    # # Dropping old Name columns
+    melted.drop(columns=["VarTime"], inplace=True)
+    # unmelting to make variables as columns, aand time in rows
+    return melted.groupby(
+        ['n', 'x', 'y', 'z', 'Time',
+         'Variable'])['Value'].sum().unstack(level=-1).reset_index()
+
+def export_all_csvs(source_folder,
+                    save_normal_grid=True,
+                    pretty_output=True,
+                    save_rotated_only=False,
+                    rotation_angle=2.2899,
+                    rotation_axis='y'):
+    # Reading the files `MESHTRIA.TXT`, `TH.TXT`, `V.TXT`, `H.TXT`
+    df = read_hydrus_data(
+        folder=source_folder, save_to_csv=False, read_velocities=True)
+    n = 0
+    if not save_rotated_only:
+        if save_normal_grid:
+            n += 1
+            save_this(df, source_folder, f'{n}-Original_Grid', authorized=True)
+        if pretty_output:
+            df = reform_grid(df)
+            n += 1
+            save_this(
+                df, source_folder, f'{n}-Original_PrettyGrid', authorized=True)
+    else:
+        df_rotated = rotate_back(
+            df, rotation_angle, rotation_axis=rotation_axis)
+        if save_normal_grid:
+            n += 1
+            save_this(
+                df_rotated,
+                source_folder,
+                f'{n}-Rotated_Grid',
+                authorized=True)
+        if pretty_output:
+            df_rotated = reform_grid(df_rotated)
+            n += 1
+            save_this(
+                df_rotated,
+                source_folder,
+                f'{n}-Rotated_PrettyGrid',
+                authorized=True)
+
+    # If required, rotate the given dataframe
+
+    # Combining the two files: `A_Level.out` and `ATMOSPH.IN`
+    n += 1
+    save_this(
+        read_a_level_out(source_folder, geom='3D'),
+        source_folder,
+        f'{n}-Atm_A_level',
+        authorized=True)
+
+    # Saving info from one file: Balance.out
+    n += 1
+    save_this(
+        read_balance_out(source_folder)[1],
+        source_folder,
+        f'{n}-MassBalance',
+        authorized=True)
+
+    # Saving eight files: SELECTOR.IN, DIMENSIO.IN, Run_Inf.out, Balance.out,
+    # A_Level.out, ATMOSPH.IN, `Boundary.out` and `Check.out` files
+    n += 1
+    save_all_simulation_info(
+        source_folder, saving_name=f'{n}-Simulation_info', save_type='csv')
+    # Reading and combining Cum_Q.out, h_Mean.out, v_Mean.out, Run_inf.out tables
+    n += 1
+    save_this(
+        get_mean_outs_table(source_folder),
+        source_folder,
+        f'{n}-BoundaryData',
+        authorized=True)
+    # Reading the file `Check.out` for materials properties
+    n += 1
+    save_this(
+        get_materials_properties(source_folder),
+        source_folder,
+        f'{n}-MaterialsData',
+        authorized=True)
+    print('**All the CSV files were exported successfully**')

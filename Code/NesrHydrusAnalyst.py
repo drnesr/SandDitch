@@ -4443,23 +4443,24 @@ def export_all_csvs(source_folder,
             save_this(
                 df, source_folder, f'{n}-Original_PrettyGrid', authorized=True)
     else:
-        df_rotated = rotate_back(
-            df, rotation_angle, rotation_axis=rotation_axis)
-        if save_normal_grid:
-            n += 1
-            save_this(
-                df_rotated,
-                source_folder,
-                f'{n}-Rotated_Grid',
-                authorized=True)
-        if pretty_output:
-            df_rotated = reform_grid(df_rotated)
-            n += 1
-            save_this(
-                df_rotated,
-                source_folder,
-                f'{n}-Rotated_PrettyGrid',
-                authorized=True)
+        if rotation_angle != 0:
+            df_rotated = rotate_back(
+                df, rotation_angle, rotation_axis=rotation_axis)
+            if save_normal_grid:
+                n += 1
+                save_this(
+                    df_rotated,
+                    source_folder,
+                    f'{n}-Rotated_Grid',
+                    authorized=True)
+            if pretty_output:
+                df_rotated = reform_grid(df_rotated)
+                n += 1
+                save_this(
+                    df_rotated,
+                    source_folder,
+                    f'{n}-Rotated_PrettyGrid',
+                    authorized=True)
 
     # If required, rotate the given dataframe
 

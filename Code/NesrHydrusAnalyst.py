@@ -4501,3 +4501,93 @@ def export_all_csvs(source_folder,
         f'{n}-MaterialsData',
         authorized=True)
     print('**All the CSV files were exported successfully**')
+    pass
+
+    
+    
+def convert_df_to_series(df, sep='_'):
+    # df= orig_df
+    # sep='_'
+    ser={}
+    for col in list(df):
+        for row in df.index:
+            nam = f'{col}{sep}{row}'
+            val = df.loc[row][col]
+            ser[nam]=val
+    return pd.Series(ser)
+
+def get_similarity_percent(file_name,
+                           original,
+                           others,
+                           caption_length=3,
+                           normal_csv=True):
+    '''
+    getting a dataframe (table) of the percent which some files in `others` 
+    folder list differ from the `original` folder. the comparisons occur only
+    on the specified `file_name`. The returned table's header contains part
+    of the others files, which is limited to the last `caption_length` letters
+    (Default=3 letters), for example, if the folder name is Hydrus_sand_exp15e
+    then the caption of this will be 15e if the caption_length=3
+    if normal_csv=False, then the file need special read function
+    '''
+    try:
+        if normal_csv:
+            orig_df = pd.read_csv(os.path.join(original, 'Nesr', file_name))
+        else:
+            orig_df = pd.read_csv(os.path.join(
+                sources[0], 'Nesr',
+                file_name)).rename(columns={
+                    'Unnamed: 0': "Feature",
+                    'Sand Ditch simulation': "Value"
+                }).set_index('Feature')
+        results = {}
+        for source in others:
+            if normal_csv:
+                comp_df = pd.read_csv(os.path.join(source, 'Nesr', file_name))
+            else:
+                comp_df = pd.read_csv(os.path.join(
+                    source, 'Nesr',
+                    file_name)).rename(columns={
+                        'Unnamed: 0': "Feature",
+                        'Sand Ditch simulation': "Value"
+                    }).set_index('Feature')
+
+            matching = (orig_df == comp_df).mean() * 100
+            results[source.split("/")[2][-caption_length:]] = matching
+        results = pd.DataFrame(results)
+        return results[results < 100].dropna()
+
+    except:
+        print(
+                f'The difference percent table cannot be calculated.')
+    pass
+
+def display_difference_values(the_file_name,
+                              original,
+                              others,
+                              caption_length=3):
+    try:
+        orig_df = pd.read_csv(os.path.join(original, 'Nesr', the_file_name))
+        results = {}
+        for source in others:
+            comp_df = pd.read_csv(os.path.join(source, 'Nesr', the_file_name))
+            falsy = orig_df != comp_df
+            orig_f = convert_df_to_series(orig_df[falsy].dropna(axis=1, how='all'))
+            comp_f = convert_df_to_series(comp_df[falsy].dropna(axis=1, how='all'))
+            if '14_' in results:
+                if list(results['14_'].index) != list(orig_f.index):
+                    print('There is an error here')
+            else:
+                results['14_'] = orig_f
+
+            results[source.split("/")[2][-caption_length:]] = comp_f
+
+        results = pd.DataFrame(results).dropna()
+        return results
+    except:
+        print(
+                f'The difference values table cannot be calculated.')
+    pass
+
+
+

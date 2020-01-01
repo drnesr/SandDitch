@@ -1638,7 +1638,7 @@ def draw_full_contour(data_frame,
 
     mn, mx = np.nanmin(M), np.nanmax(M)
     # print (mx,mn, mx-mn)
-    if mx - mn < 0.000000001:
+    if mx - mn < 0.00000000000000001:
         print(
             'For the requested contour map of {}'.format(plot_title), end='. ')
         print("The map has one value only ({}), no contour map will be drawn.".

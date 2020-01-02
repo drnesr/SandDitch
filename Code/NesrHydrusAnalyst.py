@@ -3763,6 +3763,7 @@ def get_window_time_volumes(
         region_location,
         location_is_start=False,  #the region_location =  region_end
         section='x',
+        partition_axis=None,
         grid=0.5,
         absolute_velocities=False,
         filter_negatives=True,
@@ -3774,6 +3775,15 @@ def get_window_time_volumes(
     requires:
     df: a Hydrus dataframe
     crosses: The location of the cross section at `section` 'x' for example
+    partition_axis=None: when we take a slice of the cross section perpendicular on
+            X direction, we set the `section` to 'x', but, this cross section is a
+            rectangle in Y and Z directions. In this function, we take a slice of
+            this rectangle, say the upper 5 cm in Z direction, then we take only
+            5cm of the Z direction, but all the Y direction. OR we can take the
+            left or right of the Y direction but all the Z direction. In the first
+            example set the `partition_axis` to 'z', and in the second example set
+            it to 'y'. IF none, (Default), the `partition_axis` will depend on the
+             `section` axis following the dict {'x': 'y','y': 'x','z': 'y'}[section]
     region_length: the height of the region
     region_location: the end/start position of the region
     location_is_start=False,  #the region_location =  region_end
@@ -3833,11 +3843,9 @@ def get_window_time_volumes(
         _, _, Vx, Lv = storage[velocity]  # to get storage[2.1 if 'x']
 
         # section = 'x'  # Commented not to make conflict by the above variables
-        y_length = get_full_dimensions(df)[{
-            'x': 'y',
-            'y': 'x',
-            'z': 'y'
-        }[section.lower()]]  # to get_full_dimensions(df)['y'] if 'x'
+        if partition_axis==None:
+            partition_axis = {'x': 'y','y': 'x','z': 'y'}[section.lower()]
+        y_length = get_full_dimensions(df)[partition_axis]  # to get_full_dimensions(df)['y'] if 'x'
 
         y_grids = Y.shape[0] - 1
 
@@ -3853,7 +3861,21 @@ def get_window_time_volumes(
         grd_s, grd_e = int(region_start / grid), int(region_end / grid + 1)
 
         # The cropped arrays
-        Mc, Vc = M[grd_s:grd_e, :], Vx[grd_s:grd_e, :]
+        if section.lower()=='x':
+            if partition_axis=='z':
+                Mc, Vc = M[grd_s:grd_e, :], Vx[grd_s:grd_e, :]
+            else: # partition_axis=='y'
+                Mc, Vc = M[:, grd_s:grd_e], Vx[:, grd_s:grd_e]
+        elif section.lower()=='y':
+            if partition_axis=='z':
+                Mc, Vc = M[grd_s:grd_e, :], Vx[grd_s:grd_e, :]
+            else: # partition_axis=='x'
+                Mc, Vc = M[:, grd_s:grd_e], Vx[:, grd_s:grd_e]
+        else:  # section.lower()=='z':
+            if partition_axis=='y':
+                Mc, Vc = M[grd_s:grd_e, :], Vx[grd_s:grd_e, :]
+            else: # partition_axis=='x'
+                Mc, Vc = M[:, grd_s:grd_e], Vx[:, grd_s:grd_e]
 
         # The product
         MVc = Mc * Vc

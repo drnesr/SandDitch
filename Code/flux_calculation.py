@@ -22,6 +22,15 @@ dfs = [
 #     print(crossing, flow)
 
 # Through X direction, and the window is is Y and Z directions (all Y and section of Z)
-crossing = 45
-flow = get_window_time_volumes(dfs[0], crossing, 3,28)
-print(crossing, flow)
+# crossing = 45
+# flow = get_window_time_volumes(dfs[0], crossing, 3,28, section='x')
+# print(crossing, flow)
+
+# Take the last 3 cm of each setion
+data = (('x', 'z', 45, 3, 28), ('x', 'y', 45, 3, 30),
+        ('y', 'z', 30, 3, 28), ('y', 'x', 30, 3, 45),
+        ('z', 'x', 28, 3, 45), ('z', 'y', 28, 3, 30), )
+for case in data:
+    sec, prt, crossing, s_length, s_end = case
+    flow = get_window_time_volumes(dfs[0], crossing, s_length, s_end, section=sec, partition_axis=prt)
+    print(case, flow)

@@ -26,11 +26,40 @@ dfs = [
 # flow = get_window_time_volumes(dfs[0], crossing, 3,28, section='x')
 # print(crossing, flow)
 
-# Take the last 3 cm of each setion
-data = (('x', 'z', 45, 3, 28), ('x', 'y', 45, 3, 30),
-        ('y', 'z', 30, 3, 28), ('y', 'x', 30, 3, 45),
-        ('z', 'x', 28, 3, 45), ('z', 'y', 28, 3, 30), )
-for case in data:
-    sec, prt, crossing, s_length, s_end = case
-    flow = get_window_time_volumes(dfs[0], crossing, s_length, s_end, section=sec, partition_axis=prt)
-    print(case, flow)
+# # Take the last 3 cm of each setion
+# data = (('x', 'z', 45, 3, 28), ('x', 'y', 45, 3, 30),
+#         ('y', 'z', 30, 3, 28), ('y', 'x', 30, 3, 45),
+#         ('z', 'x', 28, 3, 45), ('z', 'y', 28, 3, 30), )
+# for case in data:
+#     sec, prt, crossing, s_length, s_end = case
+#     flow = get_window_time_volumes(dfs[0], crossing, s_length, s_end, section=sec, partition_axis=prt)
+#     print(case, flow)
+
+
+# Take the most important sections
+data = (('Runoff', 'x', 'z', 45, 3, 28),
+        ('Drainage', 'x', 'z', 45, 2, 2),
+        ('Flux', 'z', 'x', 28, 3, 45),
+        ('Flux0', 'z', 'x', 28, 3, 3),
+        ('Evaporation', 'z', 'x', 28, 42, 42),
+        )
+
+'''
+First results
+('Runoff', 'x', 'z', 45, 3, 28) 1.7358156406026053
+('Drainage', 'x', 'z', 45, 2, 2) 0.01640582312869202
+('Flux', 'z', 'x', 28, 3, 45) 0.
+
+'''
+
+for fltr_neg in (True, False):
+    negs = 'Negatives are excluded' if fltr_neg else 'Negatives are included'
+    for abs_vel in (True, False):
+        abss = 'Absolute values were taken' if abs_vel else 'Values were taken with sign'
+        for case in data:
+            caption, sec, prt, crossing, s_length, s_end = case
+            flow = get_uneven_spans_area(get_window_time_volumes(dfs[0], crossing, s_length, s_end,
+                                                                 section=sec, partition_axis=prt,
+                                                                 filter_negatives=fltr_neg,
+                                                                 absolute_velocities=abs_vel))
+            print(negs, abss, case, flow)

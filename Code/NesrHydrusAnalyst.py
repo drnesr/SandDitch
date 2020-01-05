@@ -4611,5 +4611,16 @@ def display_difference_values(the_file_name,
                 f'The difference values table cannot be calculated.')
     pass
 
+def get_simulations_table(height, ends, cross_y=[0, 10, 20, 30, 45]):
+    results = {f'HYD14{x:2}': [] for x in extensions}
+    # print(results)
+    for i, x in enumerate(extensions):
+        print(f'\nHYD14{x:2}', end=': ')
+        for crossing in cross_y:
+            flow = get_uneven_spans_area(
+                get_window_time_volumes(dfs[i], crossing, height, ends))
+            results[f'HYD14{x:2}'].append(flow)
+            print('.', end='')
 
+    return pd.DataFrame(results, index=cross_y).T
 

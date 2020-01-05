@@ -4154,15 +4154,17 @@ def save_this(dataframe,
         elif save_type.lower() == 'json':
             dataframe.to_json(os.path.join(save_folder, filename))
         #print('**SAVED**')
-        print(f'**SAVED** >> path: {save_folder}/{filename}'.replace('\\', '/'))    
-        
+        print(f'**SAVED** >> path: {save_folder}/{filename}'.replace('\\', '/'))
+
+
 def read_boundary_data(folder='Current',
                        titles_loc=19,
                        data_begins=22,
                        nums_per_line=10,
-                       save_to_csv=True):
+                       save_to_csv=False,
+                       dt_frame=None):
     '''
-    A function to read both BOUNDARY.IN and  Boundary.outfiles from HYDRUS 
+    A function to read both BOUNDARY.IN and  Boundary.outfiles from HYDRUS
         outputs, then to:
             1- return one dataframe contains both data in a decent format.
             2- save this output to a CSV file (optional, True by default)
@@ -4179,7 +4181,10 @@ def read_boundary_data(folder='Current',
         read_dir = os.getcwd()
     else:
         read_dir = folder
-
+    if dt_frame is None:
+        dt_frame = read_hydrus_data(folder=folder,
+                                    save_to_csv=False,
+                                    read_velocities=True)
     # Finding number of nodes in the file
     mesh_file = os.path.join(read_dir, 'BOUNDARY.IN')
     num_cells = int(linecache.getline(mesh_file, 4).split()[0])
@@ -4194,7 +4199,7 @@ def read_boundary_data(folder='Current',
     def read_snakey_list(file_name, start_line, end_line, data_type=float):
         '''
         Reading a list of numbers thar are stored in a text file, where
-        there are `numbers_count` numbers, stored as `nums_per_line` numbers 
+        there are `numbers_count` numbers, stored as `nums_per_line` numbers
         per line, the starting position of first occurence of numbers is at
         `start_line` line number
         returns a numpy array of the data with the `data_type` given
@@ -4216,23 +4221,25 @@ def read_boundary_data(folder='Current',
     data = np.array([points, areas]).T
     data_in = pd.DataFrame(
         data, columns=titles).astype({
-            "n": int,
-            "surface_area": float
-        })
+        "n": int,
+        "surface_area": float
+    })
 
     # Adding the surface area to the above table
     # print(num_cells, nums_per_line, num_lines)
     frames = []
-    for t in get_available_timesteps(df)[1:]:
+    time_steps = get_available_timesteps(dt_frame)[1:]
+    # print(time_steps)
+    for t in time_steps:
         data_ends = data_begins + num_cells - 1
         # print(titles_loc, data_begins, num_lines, data_ends)
         dft = get_means_table(
-            os.path.join(src, 'Boundary.out'),
+            os.path.join(folder, 'Boundary.out'),
             titles_loc,
             data_begins,
             units_location=None,
             reading_end=data_ends,
-            replace_units=False)  #.sample(3)
+            replace_units=False)  # .sample(3)
         # add a column for time
         dft = dft.assign(time_step=t)
         # convert all columns to numeric
@@ -4246,12 +4253,13 @@ def read_boundary_data(folder='Current',
         data_begins = titles_loc + 3
     # display(frames)
     frames = pd.concat(frames, ignore_index=True)
-    
+
     # Saving if allowed
     # save_this(dataframe, data_folder, output_name, authorized=True)
-    save_this(frames, src, 'boundary_data.CSV', authorized=save_to_csv)
-    
-    return frames        
+    if save_to_csv:
+        save_this(frames, folder, 'boundary_data.CSV', authorized=save_to_csv)
+
+    return frames
 
 def search_for(search_word, file_name, start_line):
     '''
@@ -4450,7 +4458,7 @@ def export_all_csvs(source_folder,
                     save_normal_grid=True,
                     pretty_output=True,
                     save_rotated_only=False,
-                    rotation_angle=2.2899,
+                    rotation_angle=0,  #=2.2899
                     rotation_axis='y'):
     # Reading the files `MESHTRIA.TXT`, `TH.TXT`, `V.TXT`, `H.TXT`
     df = read_hydrus_data(
@@ -4461,10 +4469,10 @@ def export_all_csvs(source_folder,
             n += 1
             save_this(df, source_folder, f'{n}-Original_Grid', authorized=True)
         if pretty_output:
-            df = reform_grid(df)
+            df_pr = reform_grid(df)
             n += 1
             save_this(
-                df, source_folder, f'{n}-Original_PrettyGrid', authorized=True)
+                df_pr, source_folder, f'{n}-Original_PrettyGrid', authorized=True)
     else:
         if rotation_angle != 0:
             df_rotated = rotate_back(
@@ -4513,9 +4521,16 @@ def export_all_csvs(source_folder,
     save_this(
         get_mean_outs_table(source_folder),
         source_folder,
-        f'{n}-BoundaryData',
+        f'{n}-CumulativeMeans',
         authorized=True)
     # Reading the file `Check.out` for materials properties
+    # Reading and combining Boundary.out tables
+    n += 1
+    save_this(
+        read_boundary_data(source_folder, 19, 22, dt_frame=df),
+        source_folder,
+        f'{n}-BoundaryData',
+        authorized=True)
     n += 1
     save_this(
         get_materials_properties(source_folder),

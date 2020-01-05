@@ -4466,41 +4466,41 @@ def export_all_csvs(source_folder,
     n = 0
     if not save_rotated_only:
         if save_normal_grid:
-            n += 1
-            save_this(df, source_folder, f'{n}-Original_Grid', authorized=True)
+            n =1  # += 1
+            save_this(df, source_folder, f'{n:02d}-Original_Grid', authorized=True)
         if pretty_output:
             df_pr = reform_grid(df)
-            n += 1
+            n =2  # += 1
             save_this(
-                df_pr, source_folder, f'{n}-Original_PrettyGrid', authorized=True)
+                df_pr, source_folder, f'{n:02d}-Original_PrettyGrid', authorized=True)
     else:
         if rotation_angle != 0:
             df_rotated = rotate_back(
                 df, rotation_angle, rotation_axis=rotation_axis)
             if save_normal_grid:
-                n += 1
+                n =3  # += 1
                 save_this(
                     df_rotated,
                     source_folder,
-                    f'{n}-Rotated_Grid',
+                    f'{n:02d}-Rotated_Grid',
                     authorized=True)
             if pretty_output:
                 df_rotated = reform_grid(df_rotated)
-                n += 1
+                n =4  # += 1
                 save_this(
                     df_rotated,
                     source_folder,
-                    f'{n}-Rotated_PrettyGrid',
+                    f'{n:02d}-Rotated_PrettyGrid',
                     authorized=True)
 
     # If required, rotate the given dataframe
 
     # Combining the two files: `A_Level.out` and `ATMOSPH.IN`
-    n += 1
+    n =5  # += 1
     save_this(
         read_a_level_out(source_folder, geom='3D'),
         source_folder,
-        f'{n}-Atm_A_level',
+        f'{n:02d}-Atm_A_level',
         authorized=True)
 
     # Saving info from one file: Balance.out
@@ -4508,20 +4508,20 @@ def export_all_csvs(source_folder,
     save_this(
         read_balance_out(source_folder)[1],
         source_folder,
-        f'{n}-MassBalance',
+        f'{n:02d}-MassBalance',
         authorized=True)
 
     # Saving eight files: SELECTOR.IN, DIMENSIO.IN, Run_Inf.out, Balance.out,
     # A_Level.out, ATMOSPH.IN, `Boundary.out` and `Check.out` files
     n += 1
     save_all_simulation_info(
-        source_folder, saving_name=f'{n}-Simulation_info', save_type='csv')
+        source_folder, saving_name=f'{n:02d}-Simulation_info', save_type='csv')
     # Reading and combining Cum_Q.out, h_Mean.out, v_Mean.out, Run_inf.out tables
     n += 1
     save_this(
         get_mean_outs_table(source_folder),
         source_folder,
-        f'{n}-CumulativeMeans',
+        f'{n:02d}-CumulativeMeans',
         authorized=True)
     # Reading the file `Check.out` for materials properties
     # Reading and combining Boundary.out tables
@@ -4529,13 +4529,13 @@ def export_all_csvs(source_folder,
     save_this(
         read_boundary_data(source_folder, 19, 22, dt_frame=df),
         source_folder,
-        f'{n}-BoundaryData',
+        f'{n:02d}-BoundaryData',
         authorized=True)
     n += 1
     save_this(
         get_materials_properties(source_folder),
         source_folder,
-        f'{n}-MaterialsData',
+        f'{n:02d}-MaterialsData',
         authorized=True)
     print('**All the CSV files were exported successfully**')
     pass

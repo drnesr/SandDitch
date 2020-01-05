@@ -5,10 +5,10 @@ import numpy as np
 extensions = ('', 'a', 'b', 'c', 'd', 'e')
 sources = [f'../Datasets/H3D2_SandDitch0014{x}' for x in extensions]
 
-dfs = [
-    pd.read_csv(os.path.join(sources[x], 'Nesr', '1-Original_Grid.csv'))
-    for x in range(len(extensions))
-]
+# dfs = [
+#     pd.read_csv(os.path.join(sources[x], 'Nesr', '1-Original_Grid.csv'))
+#     for x in range(len(extensions))
+# ]
 # # Test at different cross sections
 # for crossing in [0, 10, 20, 30, 45]:
 #     flow = get_uneven_spans_area(
